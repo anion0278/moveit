@@ -2,29 +2,29 @@
 # Used with wstool, users can download source of all packages of MoveIt.
 - git:
     local-name: moveit_msgs
-    uri: https://github.com/ros-planning/moveit_msgs.git
+    uri: https://github.com/anion0278/moveit/moveit_msgs.git
     version: master
 - git:
     local-name: geometric_shapes
-    uri: https://github.com/ros-planning/geometric_shapes.git
+    uri: https://github.com/anion0278/moveit/geometric_shapes.git
     version: noetic-devel
 - git:
     local-name: moveit
-    uri: https://github.com/ros-planning/moveit.git
+    uri: https://github.com/anion0278/moveit/moveit.git
     version: master
 - git:
     local-name: rviz_visual_tools
-    uri: https://github.com/PickNikRobotics/rviz_visual_tools
+    uri: https://github.com/anion0278/moveit/rviz_visual_tools
     version: master
 - git:
     local-name: moveit_visual_tools
-    uri: https://github.com/ros-planning/moveit_visual_tools.git
+    uri: https://github.com/anion0278/moveit/moveit_visual_tools.git
     version: master
 - git:
     local-name: moveit_tutorials
-    uri: https://github.com/ros-planning/moveit_tutorials.git
+    uri: https://github.com/anion0278/moveit/moveit_tutorials.git
     version: master
 - git:
     local-name: panda_moveit_config
-    uri: https://github.com/ros-planning/panda_moveit_config.git
+    uri: https://github.com/anion0278/moveit/panda_moveit_config.git
     version: melodic-devel
