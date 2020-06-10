@@ -86,6 +86,7 @@ CollisionEnvFCL::CollisionEnvFCL(const moveit::core::RobotModelConstPtr& model, 
   observer_handle_ = getWorld()->addObserver(boost::bind(&CollisionEnvFCL::notifyObjectChange, this, _1, _2));
 }
 
+
 CollisionEnvFCL::CollisionEnvFCL(const moveit::core::RobotModelConstPtr& model, const WorldPtr& world, double padding,
                                  double scale)
   : CollisionEnv(model, world, padding, scale)
