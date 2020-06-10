@@ -10,7 +10,7 @@
     version: noetic-devel
 - git:
     local-name: moveit
-    uri: https://github.com/anion0278/moveit/moveit.git
+    uri: https://github.com/anion0278/moveit.git
     version: master
 - git:
     local-name: rviz_visual_tools
