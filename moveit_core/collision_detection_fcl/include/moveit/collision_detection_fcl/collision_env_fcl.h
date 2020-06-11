@@ -108,6 +108,8 @@ protected:
   void checkRobotCollisionHelper(const CollisionRequest& req, CollisionResult& res,
                                  const moveit::core::RobotState& state, const AllowedCollisionMatrix* acm) const;
 
+  double GetMinClearanceForLink(std::string linkName, DistanceMap distanceMap, bool debugInfo) const;
+
   /** \brief Construct an FCL collision object from MoveIt's World::Object. */
   void constructFCLObjectWorld(const World::Object* obj, FCLObject& fcl_obj) const;
 

@@ -235,14 +235,14 @@ void PlanningSceneMonitor::initialize(const planning_scene::PlanningScenePtr& sc
     ROS_ERROR_NAMED(LOGNAME, "Robot model not loaded");
   }
 
-  publish_planning_scene_frequency_ = 2.0;
+  publish_planning_scene_frequency_ = 20.0;
   new_scene_update_ = UPDATE_NONE;
 
   last_update_time_ = last_robot_motion_time_ = ros::Time::now();
   last_robot_state_update_wall_time_ = ros::WallTime::now();
-  dt_state_update_ = ros::WallDuration(0.03);
+  dt_state_update_ = ros::WallDuration(0.01);
 
-  double temp_wait_time = 0.05;
+  double temp_wait_time = 0.02;
 
   if (!robot_description_.empty())
     nh_.param(robot_description_ + "_planning/shape_transform_cache_lookup_wait_time", temp_wait_time, temp_wait_time);
@@ -1350,6 +1350,7 @@ void PlanningSceneMonitor::updateFrameTransforms()
 
 void PlanningSceneMonitor::publishDebugInformation(bool flag)
 {
+    ROS_ERROR("!!!!!!!!!!!!!!!! DEBUG INFO !!!!!!!!");
   if (octomap_monitor_)
     octomap_monitor_->publishDebugInformation(flag);
 }

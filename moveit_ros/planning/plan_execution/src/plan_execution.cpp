@@ -77,6 +77,8 @@ plan_execution::PlanExecution::PlanExecution(
   , planning_scene_monitor_(planning_scene_monitor)
   , trajectory_execution_manager_(trajectory_execution)
 {
+  node_handle_.setParam("collision/min_clearance", 0);
+
   if (!trajectory_execution_manager_)
     trajectory_execution_manager_.reset(new trajectory_execution_manager::TrajectoryExecutionManager(
         planning_scene_monitor_->getRobotModel(), planning_scene_monitor_->getStateMonitor()));
@@ -184,6 +186,26 @@ void plan_execution::PlanExecution::planAndExecuteHelper(ExecutableMotionPlan& p
 
     // if we never had a solved plan, or there is no specified way of fixing plans, just call the planner; otherwise,
     // try to repair the plan we previously had;
+
+    if (previously_solved)
+    {
+      ROS_INFO_NAMED("CUSTOM", "PREVIOUSLY SOLVED TRUE");
+    }
+
+    if (opt.repair_plan_callback_)
+    {
+      ROS_INFO_NAMED("CUSTOM", "REPAIR COLLBACK IS AVAILABLE");
+    }
+
+    if (!previously_solved || !opt.repair_plan_callback_)
+    {
+      ROS_INFO_NAMED("CUSTOM", "CANT REPAIR PLAN (unavailable?)");
+    }
+    else
+    {
+      ROS_INFO_NAMED("CUSTOM", "REPAIRING PREVIOUS PLAN");
+    }
+    
     bool solved =
         (!previously_solved || !opt.repair_plan_callback_) ?
             opt.plan_callback_(plan) :
@@ -243,11 +265,12 @@ void plan_execution::PlanExecution::planAndExecuteHelper(ExecutableMotionPlan& p
         d.sleep();
         ROS_INFO_NAMED("plan_execution", "Done waiting");
       }
+      ROS_INFO_NAMED("CUSTOM", "ITS POSSIBLE TO ADD CALLBACK");
     }
   } while (!preempt_requested_ && max_replan_attempts > replan_attempts);
 
   if (preempt_requested_)
-  {
+  { 
     ROS_DEBUG_NAMED("plan_execution", "PlanExecution was preempted");
     plan.error_code_.val = moveit_msgs::MoveItErrorCodes::PREEMPTED;
   }
@@ -277,17 +300,44 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
     const collision_detection::AllowedCollisionMatrix* acm =
         plan.plan_components_[path_segment.first].allowed_collision_matrix_.get();
     std::size_t wpc = t.getWayPointCount();
-    collision_detection::CollisionRequest req;
+    collision_detection::CollisionRequest req(true);
     req.group_name = t.getGroupName();
+    ///
+    double minDistance = 9999.0;
+    double minDistanceRight = minDistance;
+    double minDistanceLeft = minDistance;
+
     for (std::size_t i = std::max(path_segment.second - 1, 0); i < wpc; ++i)
     {
       collision_detection::CollisionResult res;
+      double dist = 0;
       if (acm)
-        plan.planning_scene_->checkCollisionUnpadded(req, res, t.getWayPoint(i), *acm);
+      {
+        dist = plan.planning_scene_->checkCollisionUnpadded(req, res, t.getWayPoint(i), *acm);
+      }
       else
-        plan.planning_scene_->checkCollisionUnpadded(req, res, t.getWayPoint(i));
+      {
+        dist = plan.planning_scene_->checkCollisionUnpadded(req, res, t.getWayPoint(i));
+        // for some reason the acMatrix is not avalable
+      }
+      
+      if (dist < minDistance)
+      {
+        minDistance = dist;
+      }
 
-      if (res.collision || !plan.planning_scene_->isStateFeasible(t.getWayPoint(i), false))
+        if (minDistanceRight > res.hmiRightDistance)
+        {
+            minDistanceRight = res.hmiRightDistance;
+        }
+
+        if (minDistanceLeft > res.hmiLeftDistance)
+        {
+            minDistanceLeft = res.hmiLeftDistance;
+        }
+
+
+        if (res.collision || !plan.planning_scene_->isStateFeasible(t.getWayPoint(i), false))
       {
         // call the same functions again, in verbose mode, to show what issues have been detected
         plan.planning_scene_->isStateFeasible(t.getWayPoint(i), true);
@@ -300,6 +350,14 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
         return false;
       }
     }
+    ROS_INFO_NAMED("CUSTOM", "Min distance %lf", minDistance);
+    ROS_INFO_NAMED("CUSTOM", "Min RIGHT distance %lf", minDistanceRight);
+    ROS_INFO_NAMED("CUSTOM", "Min LEFT distance %lf", minDistanceLeft);
+
+    std::string clearance_param = "collision/min_clearance";
+    node_handle_.setParam(clearance_param, minDistance);
+    node_handle_.setParam(clearance_param + "_right", minDistanceRight);
+    node_handle_.setParam(clearance_param + "_left", minDistanceLeft);
   }
   return true;
 }

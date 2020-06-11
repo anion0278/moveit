@@ -86,7 +86,6 @@ CollisionEnvFCL::CollisionEnvFCL(const moveit::core::RobotModelConstPtr& model, 
   observer_handle_ = getWorld()->addObserver(boost::bind(&CollisionEnvFCL::notifyObjectChange, this, _1, _2));
 }
 
-
 CollisionEnvFCL::CollisionEnvFCL(const moveit::core::RobotModelConstPtr& model, const WorldPtr& world, double padding,
                                  double scale)
   : CollisionEnv(model, world, padding, scale)
@@ -285,18 +284,22 @@ void CollisionEnvFCL::checkRobotCollision(const CollisionRequest& req, Collision
   ROS_ERROR_NAMED("collision_detection.fcl", "Not implemented");
 }
 
+
 void CollisionEnvFCL::checkRobotCollisionHelper(const CollisionRequest& req, CollisionResult& res,
                                                 const moveit::core::RobotState& state,
                                                 const AllowedCollisionMatrix* acm) const
 {
-  FCLObject fcl_obj;
-  constructFCLObjectRobot(state, fcl_obj);
+    FCLObject fcl_obj;
+    constructFCLObjectRobot(state, fcl_obj);
 
-  CollisionData cd(&req, &res, acm);
-  cd.enableGroup(getRobotModel());
-  for (std::size_t i = 0; !cd.done_ && i < fcl_obj.collision_objects_.size(); ++i)
-    manager_->collide(fcl_obj.collision_objects_[i].get(), &cd, &collisionCallback);
-
+    CollisionData cd(&req, &res, acm);
+    cd.enableGroup(getRobotModel());
+    for (std::size_t i = 0; !cd.done_ && i < fcl_obj.collision_objects_.size(); ++i)
+    {
+        manager_->collide(fcl_obj.collision_objects_[i].get(), &cd, &collisionCallback);
+        //auto x = (*(fcl_obj.collision_objects_[i].get())).getUserData();
+        //int k = 1;
+    }
   if (req.distance)
   {
     DistanceRequest dreq;
@@ -304,14 +307,54 @@ void CollisionEnvFCL::checkRobotCollisionHelper(const CollisionRequest& req, Col
 
     dreq.group_name = req.group_name;
     dreq.acm = acm;
+
+      std::string hmi_right_name = "hmi_right";
+      std::string hmi_left_name = "hmi_left";
+
+      bool hasLink = true; // no meaning
+
+          std::set<const moveit::core::LinkModel *> active_components{
+                  this->robot_model_->getLinkModel(hmi_right_name, &hasLink),
+                  this->robot_model_->getLinkModel(hmi_left_name, &hasLink)};
+
+          dreq.type = collision_detection::DistanceRequestTypes::ALL;
+          dreq.active_components_only = &active_components;
+          dreq.enable_signed_distance = true;
+
     dreq.enableGroup(getRobotModel());
     distanceRobot(dreq, dres, state);
     res.distance = dres.minimum_distance.distance;
+
+    res.distances = dres.distances;
+//    ROS_INFO_NAMED("Custom", "------------ HMI Right ------------");
+    res.hmiRightDistance = GetMinClearanceForLink(hmi_right_name, dres.distances, false);
+//    ROS_INFO_NAMED("Custom", "------------ HMI Left ------------");
+    res.hmiLeftDistance = GetMinClearanceForLink(hmi_left_name, dres.distances, false);
+//    ROS_INFO_NAMED("Custom", "------------- HMI END -----------");
   }
 }
 
+double CollisionEnvFCL::GetMinClearanceForLink(std::string linkName, DistanceMap distanceMap, bool debugInfo) const
+{
+    double minDistance = 9999.0;
+    for (auto& iter : distanceMap)
+    {
+        if (iter.first.first == linkName || iter.first.second == linkName)
+        {
+            double currentDist = iter.second[0].distance;
+            if (minDistance > currentDist)
+                minDistance = currentDist;
+
+            if (debugInfo)
+                ROS_INFO_NAMED("Custom", "Links: '%s' <>  '%s' - dist: %.3f",
+                           iter.first.first.c_str(), iter.first.second.c_str(), iter.second[0].distance);
+        }
+    }
+    return minDistance;
+}
+
 void CollisionEnvFCL::distanceSelf(const DistanceRequest& req, DistanceResult& res,
-                                   const moveit::core::RobotState& state) const
+                               const moveit::core::RobotState& state) const
 {
   FCLManager manager;
   allocSelfCollisionBroadPhase(state, manager);
@@ -328,7 +371,9 @@ void CollisionEnvFCL::distanceRobot(const DistanceRequest& req, DistanceResult& 
 
   DistanceData drd(&req, &res);
   for (std::size_t i = 0; !drd.done && i < fcl_obj.collision_objects_.size(); ++i)
-    manager_->distance(fcl_obj.collision_objects_[i].get(), &drd, &distanceCallback);
+  {
+      manager_->distance(fcl_obj.collision_objects_[i].get(), &drd, &distanceCallback);
+  }
 }
 
 void CollisionEnvFCL::updateFCLObject(const std::string& id)

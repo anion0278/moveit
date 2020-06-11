@@ -938,7 +938,7 @@ bool TrajectoryExecutionManager::validate(const TrajectoryExecutionContext& cont
   ROS_DEBUG_NAMED(name_, "Validating trajectory with allowed_start_tolerance %g", allowed_start_tolerance_);
 
   moveit::core::RobotStatePtr current_state;
-  if (!csm_->waitForCurrentState(ros::Time::now()) || !(current_state = csm_->getCurrentState()))
+  if (!csm_->waitForCurrentState(ros::Time::now(), 10) || !(current_state = csm_->getCurrentState()))
   {
     ROS_WARN_NAMED(name_, "Failed to validate trajectory: couldn't receive full current joint state within 1s");
     return false;

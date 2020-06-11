@@ -99,7 +99,7 @@ bool PointCloudOctomapUpdater::initialize()
   shape_mask_.reset(new point_containment_filter::ShapeMask());
   shape_mask_->setTransformCallback(boost::bind(&PointCloudOctomapUpdater::getShapeTransform, this, _1, _2));
   if (!filtered_cloud_topic_.empty())
-    filtered_cloud_publisher_ = private_nh_.advertise<sensor_msgs::PointCloud2>(filtered_cloud_topic_, 10, false);
+    filtered_cloud_publisher_ = private_nh_.advertise<sensor_msgs::PointCloud2>(filtered_cloud_topic_, 1, false);
   return true;
 }
 
@@ -107,12 +107,14 @@ void PointCloudOctomapUpdater::start()
 {
   if (point_cloud_subscriber_)
     return;
+
+  int filter_count = 1;
   /* subscribe to point cloud topic using tf filter*/
-  point_cloud_subscriber_ = new message_filters::Subscriber<sensor_msgs::PointCloud2>(root_nh_, point_cloud_topic_, 5);
+  point_cloud_subscriber_ = new message_filters::Subscriber<sensor_msgs::PointCloud2>(root_nh_, point_cloud_topic_, filter_count);
   if (tf_listener_ && tf_buffer_ && !monitor_->getMapFrame().empty())
   {
     point_cloud_filter_ = new tf2_ros::MessageFilter<sensor_msgs::PointCloud2>(*point_cloud_subscriber_, *tf_buffer_,
-                                                                               monitor_->getMapFrame(), 5, root_nh_);
+                                                                               monitor_->getMapFrame(), filter_count, root_nh_);
     point_cloud_filter_->registerCallback(boost::bind(&PointCloudOctomapUpdater::cloudMsgCallback, this, _1));
     ROS_INFO_NAMED(LOGNAME, "Listening to '%s' using message filter with target frame '%s'", point_cloud_topic_.c_str(),
                    point_cloud_filter_->getTargetFramesString().c_str());
@@ -330,6 +332,13 @@ void PointCloudOctomapUpdater::cloudMsgCallback(const sensor_msgs::PointCloud2::
 
   tree_->lockWrite();
 
+
+  tree_-> setProbHit(0.9);
+  tree_-> setProbMiss(0.2);
+  // tree_-> setClampingThresMin(0.2);
+  // tree_-> setClampingThresMax(0.8);
+
+
   try
   {
     /* mark free cells only if not seen occupied in this cloud */
@@ -341,6 +350,14 @@ void PointCloudOctomapUpdater::cloudMsgCallback(const sensor_msgs::PointCloud2::
       tree_->updateNode(occupied_cell, true);
 
     // set the logodds to the minimum for the cells that are part of the model
+    
+    // ROS_INFO_NAMED("CUSTOM!!!!!", "OCTO Hit %lf", tree_->getProbHit());
+    // ROS_INFO_NAMED("CUSTOM!!!!!", "OCTO Miss %lf", tree_->getProbMiss());
+    // ROS_INFO_NAMED("CUSTOM!!!!!", "OCTO Min %lf", tree_->getClampingThresMin());
+    // ROS_INFO_NAMED("CUSTOM!!!!!", "OCTO Max %lf", tree_->getClampingThresMax());
+    // ROS_INFO_NAMED("CUSTOM!!!!!", "OCTO Thres %lf", tree_->getOccupancyThres());
+
+
     const float lg = tree_->getClampingThresMinLog() - tree_->getClampingThresMaxLog();
     for (const octomap::OcTreeKey& model_cell : model_cells)
       tree_->updateNode(model_cell, lg);

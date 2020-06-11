@@ -432,11 +432,11 @@ public:
 
   /** \brief Check whether a specified state (\e robot_state) is in collision,
       but use a collision_detection::CollisionRobot instance that has no padding.  */
-  void checkCollisionUnpadded(const collision_detection::CollisionRequest& req,
+  double checkCollisionUnpadded(const collision_detection::CollisionRequest& req,
                               collision_detection::CollisionResult& res,
                               const moveit::core::RobotState& robot_state) const
   {
-    checkCollisionUnpadded(req, res, robot_state, getAllowedCollisionMatrix());
+    return checkCollisionUnpadded(req, res, robot_state, getAllowedCollisionMatrix());
   }
 
   /** \brief Check whether a specified state (\e robot_state) is in collision,
@@ -453,17 +453,17 @@ public:
   /** \brief Check whether a specified state (\e robot_state) is in collision, with respect to a given
       allowed collision matrix (\e acm), but use a collision_detection::CollisionRobot instance that has no padding.
       This variant of the function takes a non-const \e robot_state and calls updates the link transforms if needed. */
-  void checkCollisionUnpadded(const collision_detection::CollisionRequest& req,
+  double checkCollisionUnpadded(const collision_detection::CollisionRequest& req,
                               collision_detection::CollisionResult& res, moveit::core::RobotState& robot_state,
                               const collision_detection::AllowedCollisionMatrix& acm) const
   {
     robot_state.updateCollisionBodyTransforms();
-    checkCollisionUnpadded(req, res, static_cast<const moveit::core::RobotState&>(robot_state), acm);
+    return checkCollisionUnpadded(req, res, static_cast<const moveit::core::RobotState&>(robot_state), acm);
   }
 
   /** \brief Check whether a specified state (\e robot_state) is in collision, with respect to a given
       allowed collision matrix (\e acm), but use a collision_detection::CollisionRobot instance that has no padding.  */
-  void checkCollisionUnpadded(const collision_detection::CollisionRequest& req,
+  double checkCollisionUnpadded(const collision_detection::CollisionRequest& req,
                               collision_detection::CollisionResult& res, const moveit::core::RobotState& robot_state,
                               const collision_detection::AllowedCollisionMatrix& acm) const;
 

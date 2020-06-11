@@ -141,6 +141,77 @@ struct CostSource
   }
 };
 
+
+/** \brief Generic representation of the distance information for a pair of objects */
+    struct DistanceResultsData
+    {
+        DistanceResultsData()
+        {
+            clear();
+        }
+
+        /// The distance between two objects. If two objects are in collision, distance <= 0.
+        double distance;
+
+        /// The nearest points
+        Eigen::Vector3d nearest_points[2];
+
+        /// The object link names
+        std::string link_names[2];
+
+        /// The object body type
+        BodyType body_types[2];
+
+        /** Normalized vector connecting closest points (from link_names[0] to link_names[1])
+
+            Usually, when checking convex to convex, the normal is connecting closest points.
+            However, FCL in case of non-convex to non-convex or convex to non-convex returns
+            the contact normal for one of the two triangles that are in contact. */
+        Eigen::Vector3d normal;
+
+        /// Clear structure data
+        void clear()
+        {
+            distance = std::numeric_limits<double>::max();
+            nearest_points[0].setZero();
+            nearest_points[1].setZero();
+            body_types[0] = BodyType::WORLD_OBJECT;
+            body_types[1] = BodyType::WORLD_OBJECT;
+            link_names[0] = "";
+            link_names[1] = "";
+            normal.setZero();
+        }
+
+        /// Update structure data given DistanceResultsData object
+        void operator=(const DistanceResultsData& other)
+        {
+            distance = other.distance;
+            nearest_points[0] = other.nearest_points[0];
+            nearest_points[1] = other.nearest_points[1];
+            link_names[0] = other.link_names[0];
+            link_names[1] = other.link_names[1];
+            body_types[0] = other.body_types[0];
+            body_types[1] = other.body_types[1];
+            normal = other.normal;
+        }
+
+        /// Compare if the distance is less than another
+        bool operator<(const DistanceResultsData& other)
+        {
+            return (distance < other.distance);
+        }
+
+        /// Compare if the distance is greater than another
+        bool operator>(const DistanceResultsData& other)
+        {
+            return (distance > other.distance);
+        }
+    };
+
+/** \brief Mapping between the names of the collision objects and the DistanceResultData. */
+    typedef std::map<const std::pair<std::string, std::string>, std::vector<DistanceResultsData>> DistanceMap;
+
+
 /** \brief Representation of a collision checking result */
 struct CollisionResult
 {
@@ -170,11 +241,16 @@ struct CollisionResult
   /** \brief Number of contacts returned */
   std::size_t contact_count;
 
+  DistanceMap distances;
+
   /** \brief A map returning the pairs of body ids in contact, plus their contact details */
   ContactMap contacts;
 
   /** \brief These are the individual cost sources when costs are computed */
   std::set<CostSource> cost_sources;
+
+  double hmiRightDistance;
+  double hmiLeftDistance;
 };
 
 /** \brief Representation of a collision checking request */
@@ -191,6 +267,19 @@ struct CollisionRequest
     , verbose(false)
   {
   }
+
+  CollisionRequest(bool isDistanceRequested)
+    : distance(isDistanceRequested)
+    , cost(false)
+    , contacts(false)
+    , max_contacts(1)
+    , max_contacts_per_pair(1)
+    , max_cost_sources(1)
+    , min_cost_density(0.2)
+    , verbose(false)
+  {
+  }
+
   virtual ~CollisionRequest()
   {
   }
@@ -298,75 +387,6 @@ struct DistanceRequest
   /// This is the normalized vector connecting the closest points on the two objects.
   bool compute_gradient;
 };
-
-/** \brief Generic representation of the distance information for a pair of objects */
-struct DistanceResultsData
-{
-  DistanceResultsData()
-  {
-    clear();
-  }
-
-  /// The distance between two objects. If two objects are in collision, distance <= 0.
-  double distance;
-
-  /// The nearest points
-  Eigen::Vector3d nearest_points[2];
-
-  /// The object link names
-  std::string link_names[2];
-
-  /// The object body type
-  BodyType body_types[2];
-
-  /** Normalized vector connecting closest points (from link_names[0] to link_names[1])
-
-      Usually, when checking convex to convex, the normal is connecting closest points.
-      However, FCL in case of non-convex to non-convex or convex to non-convex returns
-      the contact normal for one of the two triangles that are in contact. */
-  Eigen::Vector3d normal;
-
-  /// Clear structure data
-  void clear()
-  {
-    distance = std::numeric_limits<double>::max();
-    nearest_points[0].setZero();
-    nearest_points[1].setZero();
-    body_types[0] = BodyType::WORLD_OBJECT;
-    body_types[1] = BodyType::WORLD_OBJECT;
-    link_names[0] = "";
-    link_names[1] = "";
-    normal.setZero();
-  }
-
-  /// Update structure data given DistanceResultsData object
-  void operator=(const DistanceResultsData& other)
-  {
-    distance = other.distance;
-    nearest_points[0] = other.nearest_points[0];
-    nearest_points[1] = other.nearest_points[1];
-    link_names[0] = other.link_names[0];
-    link_names[1] = other.link_names[1];
-    body_types[0] = other.body_types[0];
-    body_types[1] = other.body_types[1];
-    normal = other.normal;
-  }
-
-  /// Compare if the distance is less than another
-  bool operator<(const DistanceResultsData& other)
-  {
-    return (distance < other.distance);
-  }
-
-  /// Compare if the distance is greater than another
-  bool operator>(const DistanceResultsData& other)
-  {
-    return (distance > other.distance);
-  }
-};
-
-/** \brief Mapping between the names of the collision objects and the DistanceResultData. */
-typedef std::map<const std::pair<std::string, std::string>, std::vector<DistanceResultsData> > DistanceMap;
 
 /** \brief Result of a distance request. */
 struct DistanceResult

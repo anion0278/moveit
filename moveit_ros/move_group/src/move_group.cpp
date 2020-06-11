@@ -98,7 +98,10 @@ public:
           printf(MOVEIT_CONSOLE_COLOR_BLUE "\nmove_group is running but no capabilities are "
                                            "loaded.\n\n" MOVEIT_CONSOLE_COLOR_RESET);
         else
+        {
           printf(MOVEIT_CONSOLE_COLOR_GREEN "\nYou can start planning now!\n\n" MOVEIT_CONSOLE_COLOR_RESET);
+          printf(MOVEIT_CONSOLE_COLOR_GREEN "\nCUSTOM MOVEIT!\n\n" MOVEIT_CONSOLE_COLOR_RESET);
+        }
         fflush(stdout);
       }
     }

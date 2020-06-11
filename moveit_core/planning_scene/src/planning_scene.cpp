@@ -520,19 +520,26 @@ void PlanningScene::checkCollisionUnpadded(const collision_detection::CollisionR
     checkCollisionUnpadded(req, res, getCurrentState(), getAllowedCollisionMatrix());
 }
 
-void PlanningScene::checkCollisionUnpadded(const collision_detection::CollisionRequest& req,
+double PlanningScene::checkCollisionUnpadded(const collision_detection::CollisionRequest& req,
                                            collision_detection::CollisionResult& res,
                                            const moveit::core::RobotState& robot_state,
                                            const collision_detection::AllowedCollisionMatrix& acm) const
 {
   // check collision with the world using the unpadded version
   getCollisionEnvUnpadded()->checkRobotCollision(req, res, robot_state, acm);
+  double envDist = res.distance;
+  double hmiRightDist = res.hmiRightDistance;
+  double hmiLeftDist = res.hmiLeftDistance;
 
   // do self-collision checking with the unpadded version of the robot
   if (!res.collision || (req.contacts && res.contacts.size() < req.max_contacts))
   {
     getCollisionEnvUnpadded()->checkSelfCollision(req, res, robot_state, acm);
   }
+  //ROS_INFO_NAMED("CUSTOM", "SELF Min distance %lf", res.distance);
+  res.hmiRightDistance = hmiRightDist;
+  res.hmiLeftDistance = hmiLeftDist;
+  return envDist;
 }
 
 void PlanningScene::getCollidingPairs(collision_detection::CollisionResult::ContactMap& contacts)
@@ -964,10 +971,9 @@ void PlanningScene::saveGeometryToStream(std::ostream& out) const
         for (std::size_t j = 0; j < obj->shapes_.size(); ++j)
         {
           shapes::saveAsText(obj->shapes_[j].get(), out);
-          // shape_poses_ is valid isometry by contract
           out << obj->shape_poses_[j].translation().x() << " " << obj->shape_poses_[j].translation().y() << " "
               << obj->shape_poses_[j].translation().z() << std::endl;
-          Eigen::Quaterniond r(obj->shape_poses_[j].linear());
+          Eigen::Quaterniond r(obj->shape_poses_[j].rotation());
           out << r.x() << " " << r.y() << " " << r.z() << " " << r.w() << std::endl;
           if (hasObjectColor(id))
           {
@@ -1782,6 +1788,25 @@ bool PlanningScene::processCollisionObjectAdd(const moveit_msgs::CollisionObject
     subframes[name] = object_frame_transform * frame_pose;
   }
   world_->setSubframesOfObject(object.id, subframes);
+
+    if (object.id == "hmi_right") {
+        std_msgs::ColorRGBA objColor;
+        objColor.r = 0;
+        objColor.g = 255;
+        objColor.b = 0;
+        objColor.a = 0.5;
+        setObjectColor(object.id, objColor);
+    }
+
+    if (object.id == "hmi_left") {
+        std_msgs::ColorRGBA objColor;
+        objColor.r = 255;
+        objColor.g = 0;
+        objColor.b = 0;
+        objColor.a = 0.5;
+        setObjectColor(object.id, objColor);
+    }
+
   return true;
 }
 
