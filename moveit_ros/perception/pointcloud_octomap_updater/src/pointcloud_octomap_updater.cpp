@@ -333,8 +333,8 @@ void PointCloudOctomapUpdater::cloudMsgCallback(const sensor_msgs::PointCloud2::
   tree_->lockWrite();
 
 
-  tree_-> setProbHit(0.9);
-  tree_-> setProbMiss(0.2);
+  tree_-> setProbHit(0.99);
+  tree_-> setProbMiss(0.05);
   // tree_-> setClampingThresMin(0.2);
   // tree_-> setClampingThresMax(0.8);
 
