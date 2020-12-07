@@ -79,6 +79,8 @@ plan_execution::PlanExecution::PlanExecution(
 {
   node_handle_.setParam("collision/min_clearance", 0);
 
+  _markerPublisher = node_handle_.advertise<visualization_msgs::Marker>("nearest_points_marker", 10);
+
   if (!trajectory_execution_manager_)
     trajectory_execution_manager_.reset(new trajectory_execution_manager::TrajectoryExecutionManager(
         planning_scene_monitor_->getRobotModel(), planning_scene_monitor_->getStateMonitor()));
@@ -305,7 +307,9 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
     ///
     double minDistance = 9999.0;
     double minDistanceRight = minDistance;
+    collision_detection::DistanceResultsData minDistDataLeft;
     double minDistanceLeft = minDistance;
+    collision_detection::DistanceResultsData minDistDataRight;
 
     for (std::size_t i = std::max(path_segment.second - 1, 0); i < wpc; ++i)
     {
@@ -320,22 +324,23 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
         dist = plan.planning_scene_->checkCollisionUnpadded(req, res, t.getWayPoint(i));
         // for some reason the acMatrix is not avalable
       }
-      
+
+      //////////////////////////////// HMIs
       if (dist < minDistance)
       {
         minDistance = dist;
+        // for now there is no need in detailed distance info for other objects
       }
-
-        if (minDistanceRight > res.hmiRightDistance)
-        {
-            minDistanceRight = res.hmiRightDistance;
-        }
-
-        if (minDistanceLeft > res.hmiLeftDistance)
-        {
-            minDistanceLeft = res.hmiLeftDistance;
-        }
-
+      if (minDistanceRight > res.hmiRightDistance)
+      {
+          minDistanceRight = res.hmiRightDistance;
+          minDistDataRight = res.hmiRightDistanceData;
+      }
+      if (minDistanceLeft > res.hmiLeftDistance)
+      {
+          minDistanceLeft = res.hmiLeftDistance;
+          minDistDataLeft = res.hmiLeftDistanceData;
+      }
 
         if (res.collision || !plan.planning_scene_->isStateFeasible(t.getWayPoint(i), false))
       {
@@ -350,14 +355,109 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
         return false;
       }
     }
-    ROS_INFO_NAMED("CUSTOM", "Min distance %lf", minDistance);
-    ROS_INFO_NAMED("CUSTOM", "Min RIGHT distance %lf", minDistanceRight);
-    ROS_INFO_NAMED("CUSTOM", "Min LEFT distance %lf", minDistanceLeft);
+    printf("-------------------------------------------\n");
+    printf("Min distance %lf \n", minDistance);
+    printf("Min RIGHT distance %lf \n", minDistanceRight);
+    printf("Min LEFT distance %lf \n", minDistanceLeft);
 
     std::string clearance_param = "collision/min_clearance";
     node_handle_.setParam(clearance_param, minDistance);
     node_handle_.setParam(clearance_param + "_right", minDistanceRight);
     node_handle_.setParam(clearance_param + "_left", minDistanceLeft);
+
+    visualization_msgs::Marker marker;
+    if (minDistanceRight != 9999.0)
+    {
+        marker.action = visualization_msgs::Marker::ADD;
+        printf("Added\n");
+    }
+    else
+    {
+        marker.action = visualization_msgs::Marker::DELETE;
+        printf("removed\n");
+    }
+
+
+      Eigen::Vector3d p1;
+      Eigen::Vector3d p2;
+      p1 = minDistDataRight.nearest_points[0];
+      p2 = minDistDataRight.nearest_points[1];
+
+      double radius = 0.02;
+
+//      std::cout << "First (RED) object is: " << minDistDataRight.link_names[0];
+//      std::cout << "Second (Green) object is: " << minDistDataRight.link_names[1];
+
+      Eigen::Vector3d p11 = minDistDataRight.secondEigenTransform * minDistDataRight.nearest_points[0];
+      Eigen::Vector3d p22 = minDistDataRight.firstEigenTransform * minDistDataRight.nearest_points[1];
+
+      marker.header.frame_id = minDistDataRight.link_names[1];
+      marker.header.stamp = ros::Time();
+      marker.ns = "robot_point_dynamic";
+      marker.id = 1;
+      marker.type = visualization_msgs::Marker::SPHERE;
+      marker.pose.position.x = p1[0];
+      marker.pose.position.y = p1[1];
+      marker.pose.position.z = p1[2];
+      marker.pose.orientation.x = 0.0;
+      marker.pose.orientation.y = 0.0;
+      marker.pose.orientation.z = 0.0;
+      marker.pose.orientation.w = 1.0;
+      marker.scale.x = radius;
+      marker.scale.y = radius;
+      marker.scale.z = radius;
+      marker.color.a = 1.0;
+      marker.color.r = 0.0;
+      marker.color.g = 0.0;
+      marker.color.b = 1.0;
+      //_markerPublisher.publish(marker); // BOD NA ROBOTU - nejak ten bod nesedi
+
+      marker.header.frame_id = "world";
+      marker.ns = "robot_point_fixed";
+      marker.id = 2;
+      marker.pose.position.x = p11[0];
+      marker.pose.position.y = p11[1];
+      marker.pose.position.z = p11[2];
+      _markerPublisher.publish(marker); // bod na robotu v jeho nejblizsim miste - v jeho realnem miste v prostoru
+
+      ///////////////////////////////////////////
+      marker.header.frame_id = "world";
+      marker.ns = "hmi_point_fixed";
+      marker.id = 11;
+      marker.pose.position.x = p22[0];
+      marker.pose.position.y = p22[1];
+      marker.pose.position.z = p22[2];
+      marker.color.a = 1.0;
+      marker.color.r = 1.0;
+      marker.color.g = 0.0;
+      marker.color.b = 1.0;
+      _markerPublisher.publish(marker); // bod na HMI
+
+      //////////////////////////////////////////////
+      marker.ns = "vector";
+      marker.id = 33;
+      marker.type = visualization_msgs::Marker::ARROW;
+      marker.pose.position.x = 0; /// OTHERWISE IT CONCATENATES TRANSFORMS!!
+      marker.pose.position.y = 0;
+      marker.pose.position.z = 0;
+      geometry_msgs::Point ap1;
+      ap1.x = p22[0];
+      ap1.y = p22[1];
+      ap1.z = p22[2];
+      geometry_msgs::Point ap2;
+      ap2.x = p11[0];
+      ap2.y = p11[1];
+      ap2.z = p11[2];
+      marker.points.push_back(ap1);
+      marker.points.push_back(ap2);
+      marker.scale.x = 0.01;
+      marker.scale.y = 0.02;
+      marker.scale.z = 0;
+      marker.color.a = 0.5; /// TODO Show as RED if collision is detected
+      marker.color.r = 0.0;
+      marker.color.g = 1.0;
+      marker.color.b = 0.0;
+      _markerPublisher.publish(marker); // bod na HMI
   }
   return true;
 }

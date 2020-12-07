@@ -98,7 +98,7 @@ bool PointCloudOctomapUpdater::initialize()
   tf_listener_.reset(new tf2_ros::TransformListener(*tf_buffer_, root_nh_));
   shape_mask_.reset(new point_containment_filter::ShapeMask());
   shape_mask_->setTransformCallback(boost::bind(&PointCloudOctomapUpdater::getShapeTransform, this, _1, _2));
-  if (!filtered_cloud_topic_.empty())
+    if (!filtered_cloud_topic_.empty())
     filtered_cloud_publisher_ = private_nh_.advertise<sensor_msgs::PointCloud2>(filtered_cloud_topic_, 1, false);
   return true;
 }
@@ -286,6 +286,7 @@ void PointCloudOctomapUpdater::cloudMsgCallback(const sensor_msgs::PointCloud2::
             // build list of valid points if we want to publish them
             if (filtered_cloud)
             {
+              ROS_INFO("CUSTOM PUBLISHING FILTERED!! LOWERED performance");
               **iter_filtered_x = pt_iter[0];
               **iter_filtered_y = pt_iter[1];
               **iter_filtered_z = pt_iter[2];
@@ -349,8 +350,6 @@ void PointCloudOctomapUpdater::cloudMsgCallback(const sensor_msgs::PointCloud2::
     for (const octomap::OcTreeKey& occupied_cell : occupied_cells)
       tree_->updateNode(occupied_cell, true);
 
-    // set the logodds to the minimum for the cells that are part of the model
-    
     // ROS_INFO_NAMED("CUSTOM!!!!!", "OCTO Hit %lf", tree_->getProbHit());
     // ROS_INFO_NAMED("CUSTOM!!!!!", "OCTO Miss %lf", tree_->getProbMiss());
     // ROS_INFO_NAMED("CUSTOM!!!!!", "OCTO Min %lf", tree_->getClampingThresMin());
@@ -367,11 +366,12 @@ void PointCloudOctomapUpdater::cloudMsgCallback(const sensor_msgs::PointCloud2::
     ROS_ERROR_NAMED(LOGNAME, "Internal error while updating octree");
   }
   tree_->unlockWrite();
-  ROS_DEBUG_NAMED(LOGNAME, "Processed point cloud in %lf ms", (ros::WallTime::now() - start).toSec() * 1000.0);
+  //printf("Processed point cloud in %lf ms \n", (ros::WallTime::now() - start).toSec() * 1000.0);
   tree_->triggerUpdateCallback();
 
   if (filtered_cloud)
   {
+    ROS_INFO("CUSTOM PUBLISHING FILTERED - check sensors definition");
     sensor_msgs::PointCloud2Modifier pcd_modifier(*filtered_cloud);
     pcd_modifier.resize(filtered_cloud_size);
     filtered_cloud_publisher_.publish(*filtered_cloud);

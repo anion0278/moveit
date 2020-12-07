@@ -100,7 +100,7 @@ void PickPlace::displayProcessedGrasps(bool flag)
 {
   if (display_grasps_ && !flag)
     grasps_publisher_.shutdown();
-  else if (!display_grasps_ && flag)
+  else if (!display_grasps_ && flag && false) // disabled
     grasps_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>(DISPLAY_GRASP_TOPIC, 10, true);
   display_grasps_ = flag;
 }

@@ -60,11 +60,11 @@ move_group::MoveGroupContext::MoveGroupContext(
   }
 
   // configure the planning pipeline
-  planning_pipeline_->displayComputedMotionPlans(true);
+  planning_pipeline_->displayComputedMotionPlans(true); // disabled
   planning_pipeline_->checkSolutionPaths(true);
 
   if (debug_)
-    planning_pipeline_->publishReceivedRequests(true);
+    planning_pipeline_->publishReceivedRequests(true); // disabled
 }
 
 move_group::MoveGroupContext::~MoveGroupContext()

@@ -433,6 +433,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
 
   if (!filtered_cloud_topic_.empty())
   {
+    ROS_INFO("CUSTOM PUBLISHING FILTERED!! LOWERED performance");
     sensor_msgs::Image filtered_msg;
     filtered_msg.header = depth_msg->header;
     filtered_msg.height = h;

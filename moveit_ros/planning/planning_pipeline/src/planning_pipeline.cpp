@@ -194,7 +194,7 @@ void planning_pipeline::PlanningPipeline::checkSolutionPaths(bool flag)
 {
   if (check_solution_paths_ && !flag)
     contacts_publisher_.shutdown();
-  else if (!check_solution_paths_ && flag)
+  else if (!check_solution_paths_ && flag && false) // disabled
     contacts_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>(MOTION_CONTACTS_TOPIC, 100, true);
   check_solution_paths_ = flag;
 }
@@ -305,11 +305,11 @@ bool planning_pipeline::PlanningPipeline::generatePlan(const planning_scene::Pla
               collision_detection::CollisionRequest c_req;
               collision_detection::CollisionResult c_res;
               c_req.contacts = true;
-              c_req.max_contacts = 10;
-              c_req.max_contacts_per_pair = 3;
+              c_req.max_contacts = 4;
+              c_req.max_contacts_per_pair = 2;
               c_req.verbose = false;
               planning_scene->checkCollision(c_req, c_res, robot_state);
-              if (c_res.contact_count > 0)
+              if (c_res.contact_count > 0 && false) // disabled
               {
                 visualization_msgs::MarkerArray arr_i;
                 collision_detection::getCollisionMarkersFromContacts(arr_i, planning_scene->getPlanningFrame(),
@@ -318,8 +318,8 @@ bool planning_pipeline::PlanningPipeline::generatePlan(const planning_scene::Pla
               }
             }
             ROS_ERROR_STREAM("Completed listing of explanations for invalid states.");
-            if (!arr.markers.empty())
-              contacts_publisher_.publish(arr);
+            // if (!arr.markers.empty())
+            //  contacts_publisher_.publish(arr); // Collision Markers disabled to save performace
           }
         }
         else

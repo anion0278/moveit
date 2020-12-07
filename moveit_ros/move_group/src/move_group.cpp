@@ -196,9 +196,9 @@ int main(int argc, char** argv)
   planning_scene_monitor::PlanningSceneMonitorPtr planning_scene_monitor(
       new planning_scene_monitor::PlanningSceneMonitor(ROBOT_DESCRIPTION, tf_buffer));
 
+    bool debug = false;
   if (planning_scene_monitor->getPlanningScene())
   {
-    bool debug = false;
     for (int i = 1; i < argc; ++i)
       if (strncmp(argv[i], "--debug", 7) == 0)
       {
@@ -209,6 +209,8 @@ int main(int argc, char** argv)
       ROS_INFO("MoveGroup debug mode is ON");
     else
       ROS_INFO("MoveGroup debug mode is OFF");
+
+    bool debug = false; // dissable anyway
 
     printf(MOVEIT_CONSOLE_COLOR_CYAN "Starting planning scene monitors...\n" MOVEIT_CONSOLE_COLOR_RESET);
     planning_scene_monitor->startSceneMonitor();

@@ -154,7 +154,9 @@ private:
 
   unsigned int default_max_replan_attempts_;
 
-  bool preempt_requested_;
+  ros::Publisher _markerPublisher;
+
+    bool preempt_requested_;
   bool new_scene_update_;
 
   bool execution_complete_;

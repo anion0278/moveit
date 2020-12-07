@@ -127,7 +127,7 @@ plan_execution::PlanWithSensing::~PlanWithSensing()
 
 void plan_execution::PlanWithSensing::displayCostSources(bool flag)
 {
-  if (flag && !display_cost_sources_)
+  if (flag && !display_cost_sources_ && false) // disabled
     // publisher for cost sources
     cost_sources_publisher_ =
         node_handle_.advertise<visualization_msgs::MarkerArray>("display_cost_sources", 100, true);
@@ -192,7 +192,7 @@ bool plan_execution::PlanWithSensing::computePlan(ExecutableMotionPlan& plan,
     }
 
     // display the costs if needed
-    if (display_cost_sources_)
+    if (display_cost_sources_ && false) // disabled
     {
       visualization_msgs::MarkerArray arr;
       collision_detection::getCostMarkers(arr, plan.planning_scene_->getPlanningFrame(), cost_sources);

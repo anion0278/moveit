@@ -155,6 +155,8 @@ struct CostSource
 
         /// The nearest points
         Eigen::Vector3d nearest_points[2];
+        Eigen::Isometry3d firstEigenTransform;
+        Eigen::Isometry3d secondEigenTransform;
 
         /// The object link names
         std::string link_names[2];
@@ -192,6 +194,8 @@ struct CostSource
             link_names[1] = other.link_names[1];
             body_types[0] = other.body_types[0];
             body_types[1] = other.body_types[1];
+            firstEigenTransform = other.firstEigenTransform;
+            secondEigenTransform = other.secondEigenTransform;
             normal = other.normal;
         }
 
@@ -250,7 +254,10 @@ struct CollisionResult
   std::set<CostSource> cost_sources;
 
   double hmiRightDistance;
+  DistanceResultsData hmiRightDistanceData;
+
   double hmiLeftDistance;
+  DistanceResultsData hmiLeftDistanceData;
 };
 
 /** \brief Representation of a collision checking request */
@@ -400,6 +407,9 @@ struct DistanceResult
 
   /// ResultsData for the two objects with the minimum distance
   DistanceResultsData minimum_distance;
+
+  DistanceResultsData hmiRightDistanceData;
+  DistanceResultsData hmiLeftDistanceData;
 
   /// A map of distance data for each link in the req.active_components_only
   DistanceMap distances;
