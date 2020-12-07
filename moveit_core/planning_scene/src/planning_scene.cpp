@@ -1789,10 +1789,12 @@ bool PlanningScene::processCollisionObjectAdd(const moveit_msgs::CollisionObject
   }
   world_->setSubframesOfObject(object.id, subframes);
 
+
+  /////////////////////////////////// HMIs
     if (object.id == "hmi_right") {
         std_msgs::ColorRGBA objColor;
-        objColor.r = 0;
-        objColor.g = 255;
+        objColor.r = 255;
+        objColor.g = 0;
         objColor.b = 0;
         objColor.a = 0.5;
         setObjectColor(object.id, objColor);
@@ -1800,8 +1802,8 @@ bool PlanningScene::processCollisionObjectAdd(const moveit_msgs::CollisionObject
 
     if (object.id == "hmi_left") {
         std_msgs::ColorRGBA objColor;
-        objColor.r = 255;
-        objColor.g = 0;
+        objColor.r = 0;
+        objColor.g = 255;
         objColor.b = 0;
         objColor.a = 0.5;
         setObjectColor(object.id, objColor);
