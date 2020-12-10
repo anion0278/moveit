@@ -79,7 +79,7 @@ plan_execution::PlanExecution::PlanExecution(
 {
   node_handle_.setParam("collision/min_clearance", 0);
 
-  _markerPublisher = node_handle_.advertise<visualization_msgs::Marker>("nearest_points_marker", 10);
+  _markerPublisher = node_handle_.advertise<visualization_msgs::MarkerArray>("collision_vectors", 10);
 
   if (!trajectory_execution_manager_)
     trajectory_execution_manager_.reset(new trajectory_execution_manager::TrajectoryExecutionManager(
@@ -160,6 +160,7 @@ void plan_execution::PlanExecution::planAndExecute(ExecutableMotionPlan& plan,
     }
     planAndExecuteHelper(plan, opt);
   }
+  RemoveAllMarkers();
 }
 
 void plan_execution::PlanExecution::planAndExecuteHelper(ExecutableMotionPlan& plan, const Options& opt)
@@ -304,7 +305,8 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
     std::size_t wpc = t.getWayPointCount();
     collision_detection::CollisionRequest req(true);
     req.group_name = t.getGroupName();
-    ///
+
+
     double minDistance = 9999.0;
     double minDistanceRight = minDistance;
     collision_detection::DistanceResultsData minDistDataLeft;
@@ -365,102 +367,111 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
     node_handle_.setParam(clearance_param + "_right", minDistanceRight);
     node_handle_.setParam(clearance_param + "_left", minDistanceLeft);
 
-    visualization_msgs::Marker marker;
-    if (minDistanceRight != 9999.0)
-    {
-        marker.action = visualization_msgs::Marker::ADD;
-        printf("Added\n");
-    }
-    else
-    {
-        marker.action = visualization_msgs::Marker::DELETE;
-        printf("removed\n");
-    }
+    std_msgs::ColorRGBA pointColor;
+      pointColor.a = 0.9;
+      pointColor.r = 0;
+      pointColor.g = 0;
+      pointColor.b = 1;
 
+    std_msgs::ColorRGBA vectorColor;
+      vectorColor.a = 0.5;
+      vectorColor.r = 0;
+      vectorColor.g = 0;
+      vectorColor.b = 1;
 
-      Eigen::Vector3d p1;
-      Eigen::Vector3d p2;
-      p1 = minDistDataRight.nearest_points[0];
-      p2 = minDistDataRight.nearest_points[1];
-
-      double radius = 0.02;
-
-//      std::cout << "First (RED) object is: " << minDistDataRight.link_names[0];
-//      std::cout << "Second (Green) object is: " << minDistDataRight.link_names[1];
-
-      Eigen::Vector3d p11 = minDistDataRight.secondEigenTransform * minDistDataRight.nearest_points[0];
-      Eigen::Vector3d p22 = minDistDataRight.firstEigenTransform * minDistDataRight.nearest_points[1];
-
-      marker.header.frame_id = minDistDataRight.link_names[1];
-      marker.header.stamp = ros::Time();
-      marker.ns = "robot_point_dynamic";
-      marker.id = 1;
-      marker.type = visualization_msgs::Marker::SPHERE;
-      marker.pose.position.x = p1[0];
-      marker.pose.position.y = p1[1];
-      marker.pose.position.z = p1[2];
-      marker.pose.orientation.x = 0.0;
-      marker.pose.orientation.y = 0.0;
-      marker.pose.orientation.z = 0.0;
-      marker.pose.orientation.w = 1.0;
-      marker.scale.x = radius;
-      marker.scale.y = radius;
-      marker.scale.z = radius;
-      marker.color.a = 1.0;
-      marker.color.r = 0.0;
-      marker.color.g = 0.0;
-      marker.color.b = 1.0;
-      //_markerPublisher.publish(marker); // BOD NA ROBOTU - nejak ten bod nesedi
-
-      marker.header.frame_id = "world";
-      marker.ns = "robot_point_fixed";
-      marker.id = 2;
-      marker.pose.position.x = p11[0];
-      marker.pose.position.y = p11[1];
-      marker.pose.position.z = p11[2];
-      _markerPublisher.publish(marker); // bod na robotu v jeho nejblizsim miste - v jeho realnem miste v prostoru
-
-      ///////////////////////////////////////////
-      marker.header.frame_id = "world";
-      marker.ns = "hmi_point_fixed";
-      marker.id = 11;
-      marker.pose.position.x = p22[0];
-      marker.pose.position.y = p22[1];
-      marker.pose.position.z = p22[2];
-      marker.color.a = 1.0;
-      marker.color.r = 1.0;
-      marker.color.g = 0.0;
-      marker.color.b = 1.0;
-      _markerPublisher.publish(marker); // bod na HMI
-
-      //////////////////////////////////////////////
-      marker.ns = "vector";
-      marker.id = 33;
-      marker.type = visualization_msgs::Marker::ARROW;
-      marker.pose.position.x = 0; /// OTHERWISE IT CONCATENATES TRANSFORMS!!
-      marker.pose.position.y = 0;
-      marker.pose.position.z = 0;
-      geometry_msgs::Point ap1;
-      ap1.x = p22[0];
-      ap1.y = p22[1];
-      ap1.z = p22[2];
-      geometry_msgs::Point ap2;
-      ap2.x = p11[0];
-      ap2.y = p11[1];
-      ap2.z = p11[2];
-      marker.points.push_back(ap1);
-      marker.points.push_back(ap2);
-      marker.scale.x = 0.01;
-      marker.scale.y = 0.02;
-      marker.scale.z = 0;
-      marker.color.a = 0.5; /// TODO Show as RED if collision is detected
-      marker.color.r = 0.0;
-      marker.color.g = 1.0;
-      marker.color.b = 0.0;
-      _markerPublisher.publish(marker); // bod na HMI
+    PublishVector(minDistDataRight, "hmi_right", 1, pointColor, vectorColor);
+    PublishVector(minDistDataLeft, "hmi_left", 11, pointColor, vectorColor);
   }
   return true;
 }
+
+void plan_execution::PlanExecution::RemoveAllMarkers()
+{
+    Eigen::Vector3d p;
+    std_msgs::ColorRGBA c;
+    auto m = GetPointMarker("", "world", 0, p, c, visualization_msgs::Marker::DELETEALL);
+    visualization_msgs::MarkerArray markerArray;
+    markerArray.markers.push_back(m);
+    _markerPublisher.publish(markerArray);
+}
+
+void plan_execution::PlanExecution::PublishVector(collision_detection::DistanceResultsData& data, const std::string& name, int id, std_msgs::ColorRGBA& pointColor, std_msgs::ColorRGBA& vectorColor)
+{
+    Eigen::Vector3d p1World = data.secondEigenTransform * data.nearest_points[0];
+    Eigen::Vector3d p2World = data.firstEigenTransform * data.nearest_points[1];
+
+    int action = visualization_msgs::Marker::ADD;
+    if (data.distance == 9999.0 || (data.link_names[0] != "hmi_right" && data.link_names[0] != "hmi_left"))
+    {
+        action = visualization_msgs::Marker::DELETE;
+//        printf("Removed! \n");
+    }
+
+    auto mp1 = GetPointMarker(name + "_nearest_robot", "world", id + 1, p2World, pointColor, action);
+    auto mp2 = GetPointMarker(name + "_nearest_hmi", "world", id + 2, p1World, pointColor, action);
+    auto vec = GetArrowMarker(name + "_vector", "world", id + 3, p1World, p2World, pointColor, action);
+
+    visualization_msgs::MarkerArray markerArray;
+    markerArray.markers.push_back(vec);
+    markerArray.markers.push_back(mp1);
+    markerArray.markers.push_back(mp2);
+
+    if (_markerPublisher.getNumSubscribers() > 0)
+        _markerPublisher.publish(markerArray);
+}
+
+visualization_msgs::Marker plan_execution::PlanExecution::GetPointMarker(const std::string& name, const std::string& frame_id, int id, Eigen::Vector3d& point, std_msgs::ColorRGBA& pointColor, int action)
+{
+    double radius = 0.02;
+    visualization_msgs::Marker marker;
+    marker.action = action;
+    marker.header.frame_id = frame_id;
+    marker.header.stamp = ros::Time();
+    marker.ns = name;
+    marker.id = id;
+    marker.type = visualization_msgs::Marker::SPHERE;
+    marker.pose.position.x = point[0];
+    marker.pose.position.y = point[1];
+    marker.pose.position.z = point[2];
+    marker.pose.orientation.x = 0.0;
+    marker.pose.orientation.y = 0.0;
+    marker.pose.orientation.z = 0.0;
+    marker.pose.orientation.w = 1.0;
+    marker.scale.x = radius;
+    marker.scale.y = radius;
+    marker.scale.z = radius;
+    marker.color = pointColor;
+    return marker;
+}
+
+visualization_msgs::Marker plan_execution::PlanExecution::GetArrowMarker(const std::string& name, const std::string& frame_id, int id, Eigen::Vector3d& point1, Eigen::Vector3d& point2, std_msgs::ColorRGBA& arrowColor, int action)
+{
+    visualization_msgs::Marker marker;
+    marker.action = action;
+    marker.header.frame_id = frame_id;
+    marker.header.stamp = ros::Time();
+    marker.ns = name;
+    marker.id = id;
+    marker.type = visualization_msgs::Marker::ARROW;
+    geometry_msgs::Point start;
+    start.x = point1[0];
+    start.y = point1[1];
+    start.z = point1[2];
+    geometry_msgs::Point end;
+    end.x = point2[0];
+    end.y = point2[1];
+    end.z = point2[2];
+    marker.points.push_back(start);
+    marker.points.push_back(end);
+
+    marker.scale.x = 0.01;
+    marker.scale.y = 0.02;
+    marker.scale.z = 0;
+
+    marker.color = arrowColor;
+    return marker;
+}
+
 
 moveit_msgs::MoveItErrorCodes plan_execution::PlanExecution::executeAndMonitor(ExecutableMotionPlan& plan)
 {
@@ -490,9 +501,12 @@ moveit_msgs::MoveItErrorCodes plan_execution::PlanExecution::executeAndMonitor(E
   execution_complete_ = false;
 
   // push the trajectories we have slated for execution to the trajectory execution manager
+
   int prev = -1;
   for (std::size_t i = 0; i < plan.plan_components_.size(); ++i)
   {
+      printf("Number of waypoints: %d \n", plan.plan_components_[i].trajectory_->getWayPointCount());
+
     // \todo should this be in trajectory_execution ? Maybe. Then that will have to use kinematic_trajectory too;
     // spliting trajectories for controllers becomes interesting: tied to groups instead of joints. this could cause
     // some problems
@@ -556,7 +570,7 @@ moveit_msgs::MoveItErrorCodes plan_execution::PlanExecution::executeAndMonitor(E
       boost::bind(&PlanExecution::doneWithTrajectoryExecution, this, _1),
       boost::bind(&PlanExecution::successfulTrajectorySegmentExecution, this, &plan, _1));
   // wait for path to be done, while checking that the path does not become invalid
-  ros::Rate r(100);
+  ros::Rate r(100); ///////////////////////////////////////////////////////////////////////////////////////////////////////// TODO CUSTOM DMS CHECK OUT
   path_became_invalid_ = false;
   while (node_handle_.ok() && !execution_complete_ && !preempt_requested_ && !path_became_invalid_)
   {

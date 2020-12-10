@@ -555,6 +555,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   // at this point we still have not freed the space
   free_space_updater_->pushLazyUpdate(occupied_cells_ptr, model_cells_ptr, sensor_origin);
 
+  //printf("Processed depth image in %lf ms \n", (ros::WallTime::now() - start).toSec() * 1000.0);
   ROS_DEBUG_NAMED(LOGNAME, "Processed depth image in %lf ms", (ros::WallTime::now() - start).toSec() * 1000.0);
 }
 }  // namespace occupancy_map_monitor

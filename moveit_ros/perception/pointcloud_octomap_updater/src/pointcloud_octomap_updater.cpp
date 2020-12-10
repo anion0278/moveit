@@ -366,9 +366,9 @@ void PointCloudOctomapUpdater::cloudMsgCallback(const sensor_msgs::PointCloud2::
     ROS_ERROR_NAMED(LOGNAME, "Internal error while updating octree");
   }
   tree_->unlockWrite();
-  //printf("Processed point cloud in %lf ms \n", (ros::WallTime::now() - start).toSec() * 1000.0);
   tree_->triggerUpdateCallback();
 
+  //printf("Processed point cloud (without publishing filtered) in %lf ms \n", (ros::WallTime::now() - start).toSec() * 1000.0);
   if (filtered_cloud)
   {
     ROS_INFO("CUSTOM PUBLISHING FILTERED - check sensors definition");

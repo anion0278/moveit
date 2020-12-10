@@ -143,6 +143,12 @@ private:
   void planAndExecuteHelper(ExecutableMotionPlan& plan, const Options& opt);
   bool isRemainingPathValid(const ExecutableMotionPlan& plan, const std::pair<int, int>& path_segment);
 
+    void PublishVector(collision_detection::DistanceResultsData& data, const std::string& name, int id, std_msgs::ColorRGBA& pointColor, std_msgs::ColorRGBA& vectorColor);
+    visualization_msgs::Marker GetPointMarker(const std::string& name, const std::string& frame_id, int id, Eigen::Vector3d& point, std_msgs::ColorRGBA& pointColor, int action);
+    visualization_msgs::Marker GetArrowMarker(const std::string& name, const std::string& frame_id, int id, Eigen::Vector3d& point1, Eigen::Vector3d& point2, std_msgs::ColorRGBA& arrowColor, int action);
+    void RemoveAllMarkers();
+
+
   void planningSceneUpdatedCallback(const planning_scene_monitor::PlanningSceneMonitor::SceneUpdateType update_type);
   void doneWithTrajectoryExecution(const moveit_controller_manager::ExecutionStatus& status);
   void successfulTrajectorySegmentExecution(const ExecutableMotionPlan* plan, std::size_t index);
