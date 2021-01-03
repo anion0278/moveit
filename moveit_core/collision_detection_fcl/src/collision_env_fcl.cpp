@@ -313,50 +313,28 @@ void CollisionEnvFCL::checkRobotCollisionHelper(const CollisionRequest& req, Col
 
       bool hasLink = true; // no meaning
 
-          std::set<const moveit::core::LinkModel *> active_components{
-                  this->robot_model_->getLinkModel(hmi_right_name, &hasLink),
-                  this->robot_model_->getLinkModel(hmi_left_name, &hasLink)};
+      std::set<const moveit::core::LinkModel *> active_components{
+              this->robot_model_->getLinkModel(hmi_right_name, &hasLink),
+              this->robot_model_->getLinkModel(hmi_left_name, &hasLink)};
 
-          dreq.type = collision_detection::DistanceRequestTypes::ALL;
-          dreq.active_components_only = &active_components;
-          dreq.enable_signed_distance = true;
+      dreq.type = collision_detection::DistanceRequestTypes::ALL;
+      dreq.active_components_only = &active_components;
+      dreq.enable_signed_distance = true;
 
     dreq.enableGroup(getRobotModel());
     distanceRobot(dreq, dres, state);
-    res.distance = dres.minimum_distance.distance;
 
-    // Have to get  same dat for each side res.distanceData = dres.minimum_distance;
+      res.distances = dres.distances;
+      res.distance = dres.minimum_distance.distance; // basically useless
+
     res.hmiRightDistanceData = dres.hmiRightDistanceData;
     res.hmiLeftDistanceData = dres.hmiLeftDistanceData;
+    res.nonHmiDistanceData = dres.nonHmiDistanceData;
 
-    res.distances = dres.distances;
-//    ROS_INFO_NAMED("Custom", "------------ HMI Right ------------");
-    res.hmiRightDistance = GetMinClearanceForLink(hmi_right_name, hmi_left_name, res.distances, false);
-//    ROS_INFO_NAMED("Custom", "------------ HMI Left ------------");
-    res.hmiLeftDistance = GetMinClearanceForLink(hmi_left_name, hmi_right_name, res.distances, false);
-//    ROS_INFO_NAMED("Custom", "------------- HMI END -----------");
+    res.hmiRightDistance = dres.hmiRightDistanceData.distance;
+    res.hmiLeftDistance = dres.hmiLeftDistanceData.distance;
+    res.nonHmiDistance = dres.nonHmiDistanceData.distance;
   }
-}
-
-double CollisionEnvFCL::GetMinClearanceForLink(std::string linkName, std::string secondLinkName,  DistanceMap distanceMap, bool debugInfo) const
-{
-    double minDistance = 9999.0;
-    for (auto& iter : distanceMap)
-    {
-        // if ((iter.first.first == linkName && iter.first.second == secondLinkName) // make sure that we do not find min distance between HMIs
-            // || (iter.first.second == linkName && iter.first.first == secondLinkName))
-        if (iter.first.first == linkName || iter.first.second == linkName)
-        {
-            double currentDist = iter.second[0].distance;
-            if (minDistance > currentDist)
-                minDistance = currentDist;
-
-            if (debugInfo)
-                ROS_INFO_NAMED("Custom", "Links: '%s' <>  '%s' - dist: %.3f",
-                               iter.first.first.c_str(), iter.first.second.c_str(), iter.second[0].distance);
-        }
-    }
-    return minDistance;
 }
 
 void CollisionEnvFCL::distanceSelf(const DistanceRequest& req, DistanceResult& res,

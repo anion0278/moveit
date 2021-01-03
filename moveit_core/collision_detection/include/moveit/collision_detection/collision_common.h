@@ -258,6 +258,9 @@ struct CollisionResult
 
   double hmiLeftDistance;
   DistanceResultsData hmiLeftDistanceData;
+
+  double nonHmiDistance;
+  DistanceResultsData nonHmiDistanceData;
 };
 
 /** \brief Representation of a collision checking request */
@@ -410,6 +413,7 @@ struct DistanceResult
 
   DistanceResultsData hmiRightDistanceData;
   DistanceResultsData hmiLeftDistanceData;
+  DistanceResultsData nonHmiDistanceData;
 
   /// A map of distance data for each link in the req.active_components_only
   DistanceMap distances;

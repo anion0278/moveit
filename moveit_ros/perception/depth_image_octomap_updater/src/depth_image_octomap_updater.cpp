@@ -119,6 +119,8 @@ bool DepthImageOctomapUpdater::initialize()
 {
   tf_buffer_ = monitor_->getTFClient();
   free_space_updater_.reset(new LazyFreeSpaceUpdater(tree_));
+    tree_-> setProbHit(0.995);
+    tree_-> setProbMiss(0.005);
 
   // create our mesh filter
   mesh_filter_.reset(new mesh_filter::MeshFilter<mesh_filter::StereoCameraModel>(
@@ -264,6 +266,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
       for (int t = 0; t < nt; ++t)
         try
         {
+            // TODO possible to use static transform, but actually its really fast - 0.01 ms or less
           tf2::fromMsg(
               tf_buffer_->lookupTransform(monitor_->getMapFrame(), depth_msg->header.frame_id, depth_msg->header.stamp),
               map_h_sensor);
@@ -347,6 +350,14 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   const double px = info_msg->K[2];
   const double py = info_msg->K[5];
 
+//   printf("OCTO Hit %lf \n", tree_->getProbHit());
+//   printf("OCTO Miss %lf \n", tree_->getProbMiss());
+
+//     printf("OCTO Min %lf \n", tree_->getClampingThresMin());
+//     printf("OCTO Max %lf \n", tree_->getClampingThresMax());
+//     printf("OCTO Thres %lf \n", tree_->getOccupancyThres());
+
+
   // if the camera parameters have changed at all, recompute the cache we had
   if (w >= static_cast<int>(x_cache_.size()) || h >= static_cast<int>(y_cache_.size()) || K2_ != px || K5_ != py ||
       K0_ != info_msg->K[0] || K4_ != info_msg->K[4])
@@ -376,6 +387,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
       y_cache_[y] = (y - py) * inv_fy_;
   }
 
+  // TODO possible to use static transform
   const octomap::point3d sensor_origin(map_h_sensor.getOrigin().getX(), map_h_sensor.getOrigin().getY(),
                                        map_h_sensor.getOrigin().getZ());
 
@@ -394,7 +406,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   mesh_filter_->getFilteredLabels(&filtered_labels_[0]);
 
   // publish debug information if needed
-  if (debug_info_)
+  if (false) // disabled
   {
     sensor_msgs::Image debug_msg;
     debug_msg.header = depth_msg->header;
@@ -433,7 +445,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
 
   if (!filtered_cloud_topic_.empty())
   {
-    ROS_INFO("CUSTOM PUBLISHING FILTERED!! LOWERED performance");
+    printf("PUBLISHING FILTERED! LOWERED performance");
     sensor_msgs::Image filtered_msg;
     filtered_msg.header = depth_msg->header;
     filtered_msg.height = h;
@@ -496,7 +508,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
           }
         }
     }
-    else
+    else // they should have applied DRY principle
     {
       const float* input_row = reinterpret_cast<const float*>(&depth_msg->data[0]);
 
@@ -556,6 +568,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   free_space_updater_->pushLazyUpdate(occupied_cells_ptr, model_cells_ptr, sensor_origin);
 
   //printf("Processed depth image in %lf ms \n", (ros::WallTime::now() - start).toSec() * 1000.0);
-  ROS_DEBUG_NAMED(LOGNAME, "Processed depth image in %lf ms", (ros::WallTime::now() - start).toSec() * 1000.0);
+
+  //ROS_DEBUG_NAMED(LOGNAME, "Processed depth image in %lf ms", (ros::WallTime::now() - start).toSec() * 1000.0);
 }
 }  // namespace occupancy_map_monitor

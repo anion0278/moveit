@@ -306,8 +306,12 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
     collision_detection::CollisionRequest req(true);
     req.group_name = t.getGroupName();
 
+    std::string hmiLeft = "hmi_left";
+    std::string hmiRight = "hmi_right";
 
     double minDistance = 9999.0;
+    double minDistanceNonHmi = minDistance;
+    collision_detection::DistanceResultsData minDistDataNonHmi;
     double minDistanceRight = minDistance;
     collision_detection::DistanceResultsData minDistDataLeft;
     double minDistanceLeft = minDistance;
@@ -331,8 +335,8 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
       if (dist < minDistance)
       {
         minDistance = dist;
-        // for now there is no need in detailed distance info for other objects
       }
+
       if (minDistanceRight > res.hmiRightDistance)
       {
           minDistanceRight = res.hmiRightDistance;
@@ -343,8 +347,13 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
           minDistanceLeft = res.hmiLeftDistance;
           minDistDataLeft = res.hmiLeftDistanceData;
       }
+      if (minDistanceNonHmi > res.nonHmiDistance)
+      {
+          minDistanceNonHmi = res.nonHmiDistance;
+          minDistDataNonHmi = res.nonHmiDistanceData; // for now does not contain transfomration data - see collision_common
+      }
 
-        if (res.collision || !plan.planning_scene_->isStateFeasible(t.getWayPoint(i), false))
+      if (res.collision || !plan.planning_scene_->isStateFeasible(t.getWayPoint(i), false))
       {
         // call the same functions again, in verbose mode, to show what issues have been detected
         plan.planning_scene_->isStateFeasible(t.getWayPoint(i), true);
@@ -358,14 +367,15 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
       }
     }
     printf("-------------------------------------------\n");
-    printf("Min distance %lf \n", minDistance);
-    printf("Min RIGHT distance %lf \n", minDistanceRight);
-    printf("Min LEFT distance %lf \n", minDistanceLeft);
+    printf("Min distance: %lf [m]\n", minDistance);
+    printf("Min distance to obstacle: %lf [m]\n", minDistanceNonHmi);
+    printf("Min right HMI distance: %lf [m]\n", minDistanceRight);
+    printf("Min left HMI distance: %lf [m]\n", minDistanceLeft);
 
     std::string clearance_param = "collision/min_clearance";
-    node_handle_.setParam(clearance_param, minDistance);
-    node_handle_.setParam(clearance_param + "_right", minDistanceRight);
-    node_handle_.setParam(clearance_param + "_left", minDistanceLeft);
+    node_handle_.setParam(clearance_param, minDistanceNonHmi);
+    node_handle_.setParam(clearance_param + "_" + hmiRight, minDistanceRight);
+    node_handle_.setParam(clearance_param + "_" + hmiLeft, minDistanceLeft);
 
     std_msgs::ColorRGBA pointColor;
       pointColor.a = 0.9;
@@ -379,8 +389,8 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
       vectorColor.g = 0;
       vectorColor.b = 1;
 
-    PublishVector(minDistDataRight, "hmi_right", 1, pointColor, vectorColor);
-    PublishVector(minDistDataLeft, "hmi_left", 11, pointColor, vectorColor);
+    PublishVector(minDistDataRight, hmiRight, 1, pointColor, vectorColor);
+    PublishVector(minDistDataLeft, hmiLeft, 11, pointColor, vectorColor);
   }
   return true;
 }
@@ -404,7 +414,6 @@ void plan_execution::PlanExecution::PublishVector(collision_detection::DistanceR
     if (data.distance == 9999.0 || (data.link_names[0] != "hmi_right" && data.link_names[0] != "hmi_left"))
     {
         action = visualization_msgs::Marker::DELETE;
-//        printf("Removed! \n");
     }
 
     auto mp1 = GetPointMarker(name + "_nearest_robot", "world", id + 1, p2World, pointColor, action);
@@ -453,6 +462,10 @@ visualization_msgs::Marker plan_execution::PlanExecution::GetArrowMarker(const s
     marker.ns = name;
     marker.id = id;
     marker.type = visualization_msgs::Marker::ARROW;
+    marker.pose.orientation.x = 0.0;
+    marker.pose.orientation.y = 0.0;
+    marker.pose.orientation.z = 0.0;
+    marker.pose.orientation.w = 1.0;
     geometry_msgs::Point start;
     start.x = point1[0];
     start.y = point1[1];

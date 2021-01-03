@@ -598,14 +598,13 @@ bool distanceCallback(fcl::CollisionObjectd* o1, fcl::CollisionObjectd* o2, void
     std::string hmi_right_name = "hmi_right";
     std::string hmi_left_name = "hmi_left";
 
-    // these cases should be handled by matrix of disabled, but its better to check
+    // these cases should be handled by matrix of disabled collisions, but it is better to check
     bool isUnrelatedDistance = ((dist_result.link_names[0] == hmi_right_name && dist_result.link_names[1] == hmi_left_name)
             || (dist_result.link_names[1] == hmi_right_name && dist_result.link_names[0] == hmi_left_name));
     if (isUnrelatedDistance)
     {
         printf("DETECTED UNRELATED DISTANCE CALCULATION\n");
     }
-
 
     bool isHmiDist = dist_result.link_names[0] == hmi_right_name || dist_result.link_names[1] == hmi_right_name ||
                     dist_result.link_names[0] ==  hmi_left_name || dist_result.link_names[1] == hmi_left_name;
@@ -620,18 +619,24 @@ bool distanceCallback(fcl::CollisionObjectd* o1, fcl::CollisionObjectd* o2, void
         auto o2Trans = o2->getTranslation();
         Eigen::Isometry3d trf2 = Eigen::Isometry3d(Eigen::Translation3d(o2Trans[0], o2Trans[1], o2Trans[2]) * Eigen::Quaterniond(o2Quat[0], o2Quat[1], o2Quat[2], o2Quat[3]));
         dist_result.secondEigenTransform = trf2;
+
+        bool isRightHmi = dist_result.link_names[0] == hmi_right_name || dist_result.link_names[1] == hmi_right_name;
+        if (dist_result.distance < cdata->res->hmiRightDistanceData.distance && isRightHmi)
+        {
+            cdata->res->hmiRightDistanceData = dist_result;
+        }
+
+        bool isLeftHmi = dist_result.link_names[0] == hmi_left_name || dist_result.link_names[1] == hmi_left_name;
+        if (dist_result.distance < cdata->res->hmiLeftDistanceData.distance && isLeftHmi)
+        {
+            cdata->res->hmiLeftDistanceData = dist_result;
+        }
     }
 
-    bool isRightHmi = dist_result.link_names[0] == hmi_right_name || dist_result.link_names[1] == hmi_right_name;
-    if (dist_result.distance < cdata->res->hmiRightDistanceData.distance && isRightHmi)
+    if (dist_result.distance < cdata->res->nonHmiDistanceData.distance && !isHmiDist)
     {
-        cdata->res->hmiRightDistanceData = dist_result;
-    }
-
-    bool isLeftHmi = dist_result.link_names[0] == hmi_left_name || dist_result.link_names[1] == hmi_left_name;
-    if (dist_result.distance < cdata->res->hmiLeftDistanceData.distance && isLeftHmi)
-    {
-        cdata->res->hmiLeftDistanceData = dist_result;
+        // min distance related to objects apart from HMIs
+        cdata->res->nonHmiDistanceData = dist_result;
     }
 
     if (dist_result.distance <= 0)

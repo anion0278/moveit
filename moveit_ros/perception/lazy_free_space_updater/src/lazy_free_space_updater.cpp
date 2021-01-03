@@ -187,7 +187,7 @@ void LazyFreeSpaceUpdater::processThread()
     tree_->unlockWrite();
     tree_->triggerUpdateCallback();
 
-    ROS_DEBUG_NAMED(LOGNAME, "Marked free cells in %lf ms", (ros::WallTime::now() - start).toSec() * 1000.0);
+    //printf("Marked free cells in %lf ms \n", (ros::WallTime::now() - start).toSec() * 1000.0); // 8 - 10 - 12ms min-avr-max
 
     delete process_occupied_cells_set_;
     process_occupied_cells_set_ = nullptr;
