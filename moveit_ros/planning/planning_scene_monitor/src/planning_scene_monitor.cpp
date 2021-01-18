@@ -391,6 +391,7 @@ void PlanningSceneMonitor::scenePublishingThread()
               boost::bind(&PlanningSceneMonitor::currentWorldObjectUpdateCallback, this, _1, _2));
           if (octomap_monitor_)
           {
+            // printf("Excluding objects \n");
             excludeAttachedBodiesFromOctree();  // in case updates have happened to the attached bodies, put them in
             excludeWorldObjectsFromOctree();    // in case updates have happened to the attached bodies, put them in
           }
@@ -652,6 +653,12 @@ void PlanningSceneMonitor::collisionObjectCallback(const moveit_msgs::CollisionO
     if (!scene_->processCollisionObjectMsg(*obj))
       return;
   }
+//  excludeWorldObjectsFromOctree(); 
+  // CUSTOM faster octomap updated after adding/moving a collision object
+    boost::recursive_mutex::scoped_lock _(shape_handles_lock_);
+    for (const std::pair<const std::string, collision_detection::World::ObjectPtr>& it : *scene_->getWorld())
+        excludeWorldObjectFromOctree(it.second);
+
   triggerSceneUpdateEvent(UPDATE_GEOMETRY);
 }
 
@@ -1059,7 +1066,7 @@ void PlanningSceneMonitor::startWorldGeometryMonitor(const std::string& collisio
   if (!collision_objects_topic.empty())
   {
     collision_object_subscriber_ =
-        root_nh_.subscribe(collision_objects_topic, 1024, &PlanningSceneMonitor::collisionObjectCallback, this);
+        root_nh_.subscribe(collision_objects_topic, 10, &PlanningSceneMonitor::collisionObjectCallback, this); // REDUCED QUEUE !!!
     ROS_INFO_NAMED(LOGNAME, "Listening to '%s'", root_nh_.resolveName(collision_objects_topic).c_str());
   }
 

@@ -59,8 +59,9 @@ DepthImageOctomapUpdater::DepthImageOctomapUpdater()
   , filtered_label_transport_(nh_)
   , image_topic_("depth")
   , queue_size_(5)
-  , near_clipping_plane_distance_(0.3)
+  , near_clipping_plane_distance_(0.1)
   , far_clipping_plane_distance_(5.0)
+  , hmi_padding_reduction(0.0)
   , shadow_threshold_(0.04)
   , padding_scale_(0.0)
   , padding_offset_(0.02)
@@ -94,6 +95,8 @@ bool DepthImageOctomapUpdater::setParams(XmlRpc::XmlRpcValue& params)
     if (params.hasMember("queue_size"))
       queue_size_ = (int)params["queue_size"];
 
+    readXmlParam(params, "hmi_padding_reduction", &hmi_padding_reduction);
+
     readXmlParam(params, "near_clipping_plane_distance", &near_clipping_plane_distance_);
     readXmlParam(params, "far_clipping_plane_distance", &far_clipping_plane_distance_);
     readXmlParam(params, "shadow_threshold", &shadow_threshold_);
@@ -119,8 +122,14 @@ bool DepthImageOctomapUpdater::initialize()
 {
   tf_buffer_ = monitor_->getTFClient();
   free_space_updater_.reset(new LazyFreeSpaceUpdater(tree_));
+
     tree_-> setProbHit(0.995);
     tree_-> setProbMiss(0.005);
+
+//    tree_ -> setOccupancyThres(0.4);
+
+    tree_ -> setClampingThresMax(0.8);
+    tree_ -> setClampingThresMin(0.2);
 
   // create our mesh filter
   mesh_filter_.reset(new mesh_filter::MeshFilter<mesh_filter::StereoCameraModel>(
@@ -169,7 +178,8 @@ mesh_filter::MeshHandle DepthImageOctomapUpdater::excludeShape(const shapes::Sha
       h = mesh_filter_->addMesh(static_cast<const shapes::Mesh&>(*shape));
     else
     {
-      std::unique_ptr<shapes::Mesh> m(shapes::createMeshFromShape(shape.get()));
+        printf("Padding reduction for HMI: %lf \n", hmi_padding_reduction);
+      std::unique_ptr<shapes::Mesh> m(shapes::createMeshFromShape(shape.get(), hmi_padding_reduction));
       if (m)
         h = mesh_filter_->addMesh(*m);
     }
@@ -215,6 +225,8 @@ static const bool HOST_IS_BIG_ENDIAN = host_is_big_endian();
 void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstPtr& depth_msg,
                                                   const sensor_msgs::CameraInfoConstPtr& info_msg)
 {
+//  printf("Queue size %d \n", queue_size_);
+
   ROS_DEBUG_NAMED(LOGNAME, "Received a new depth image message (frame = '%s', encoding='%s')",
                   depth_msg->header.frame_id.c_str(), depth_msg->encoding.c_str());
   ros::WallTime start = ros::WallTime::now();

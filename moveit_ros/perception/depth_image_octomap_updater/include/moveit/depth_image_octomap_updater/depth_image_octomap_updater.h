@@ -85,6 +85,7 @@ private:
   std::size_t queue_size_;
   double near_clipping_plane_distance_;
   double far_clipping_plane_distance_;
+  double hmi_padding_reduction;
   double shadow_threshold_;
   double padding_scale_;
   double padding_offset_;

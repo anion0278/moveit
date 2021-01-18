@@ -46,7 +46,7 @@ namespace occupancy_map_monitor
 class LazyFreeSpaceUpdater
 {
 public:
-  LazyFreeSpaceUpdater(const OccMapTreePtr& tree, unsigned int max_batch_size = 10);
+  LazyFreeSpaceUpdater(const OccMapTreePtr& tree, unsigned int max_batch_size = 1); // Batch size of changes is super important for performance (speed of OctoMap update)
   ~LazyFreeSpaceUpdater();
 
   void pushLazyUpdate(octomap::KeySet* occupied_cells, octomap::KeySet* model_cells,

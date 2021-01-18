@@ -60,8 +60,8 @@ class PlanningSceneInterface(object):
         """ Create a planning scene interface; it uses both C++ wrapped methods and scene manipulation topics. """
         self._psi = _moveit_planning_scene_interface.PlanningSceneInterface(ns)
 
-        self._pub_co = rospy.Publisher(ns + '/collision_object', CollisionObject, queue_size=100)
-        self._pub_aco = rospy.Publisher(ns + '/attached_collision_object', AttachedCollisionObject, queue_size=100)
+        self._pub_co = rospy.Publisher(ns + '/collision_object', CollisionObject, queue_size=5)
+        self._pub_aco = rospy.Publisher(ns + '/attached_collision_object', AttachedCollisionObject, queue_size=1)
         self.__synchronous = synchronous
         if self.__synchronous:
             self._apply_planning_scene_diff = rospy.ServiceProxy(ns + '/apply_planning_scene', ApplyPlanningScene)
@@ -163,6 +163,15 @@ class PlanningSceneInterface(object):
         if name is not None:
             aco.object.id = name
         self.__submit(aco, attach=True)
+
+    def move_object(self, name, pose):
+        co = CollisionObject()
+        co.operation = CollisionObject.MOVE
+        co.id = name
+        co.header = pose.header
+        co.primitive_poses = [pose.pose]
+        #sphere.dimensions = [radius] # future
+        self.__submit(co, attach=False)
 
     def get_known_object_names(self, with_type=False):
         """

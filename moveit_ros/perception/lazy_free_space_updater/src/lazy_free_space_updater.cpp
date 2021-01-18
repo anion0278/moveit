@@ -71,6 +71,7 @@ LazyFreeSpaceUpdater::~LazyFreeSpaceUpdater()
 void LazyFreeSpaceUpdater::pushLazyUpdate(octomap::KeySet* occupied_cells, octomap::KeySet* model_cells,
                                           const octomap::point3d& sensor_origin)
 {
+//    printf("Batch size : %d \n", max_batch_size_);
   ROS_DEBUG_NAMED(LOGNAME, "Pushing %lu occupied cells and %lu model cells for lazy updating...",
                   (long unsigned int)occupied_cells->size(), (long unsigned int)model_cells->size());
   boost::mutex::scoped_lock _(update_cell_sets_lock_);

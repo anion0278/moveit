@@ -1860,9 +1860,28 @@ bool PlanningScene::processCollisionObjectMove(const moveit_msgs::CollisionObjec
     if (obj->shapes_.size() == new_poses.size())
     {
       std::vector<shapes::ShapeConstPtr> shapes = obj->shapes_;
-      obj.reset();
-      world_->removeObject(object.id);
-      world_->addToObject(object.id, shapes, new_poses);
+
+//        world_->removeObject(object.id);
+//        world_->addToObject(object.id, shapes, new_poses);
+
+//       shapes::Sphere& hmi_obj = dynamic_cast<shapes::Sphere&>(*shapes[0]);
+//        static_cast<const shapes::Sphere&>(*shape)
+//        static_cast<const shapes::Cylinder*>(s)->length
+
+//       hmi_obj.radius = 0.5; // const :(
+//        x.get()->set_size(0.4);
+
+//        shapes[0]->print();
+
+//      auto hmi_obj = shapes[0];
+//      auto x = dynamic_cast<shapes::Sphere&>(hmi_obj);
+//        ROS_ERROR_NAMED(LOGNAME, "header: %s", object.id.c_str());
+
+//        std::cout << "WTF .xyz = [" << t.translation().x() << ", " << t.translation().y() << ", "
+//                  << t.translation().z() << "], Q.xyzw = ["  << std::endl;
+
+        world_->moveShapeInObject(object.id, shapes[0], new_poses[0]);
+      ROS_ERROR_NAMED(LOGNAME, "PROCESSED MOVE MSG");
     }
     else
     {
