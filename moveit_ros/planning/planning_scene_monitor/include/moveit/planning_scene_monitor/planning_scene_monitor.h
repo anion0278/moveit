@@ -661,12 +661,10 @@ protected:
       : planning_scene_monitor_(planning_scene_monitor), read_only_(read_only)
     {
       if (read_only) {  // SHARED LOCK - no other thread can acquire the exclusive lock, but can acquire the shared lock.
-          lockReadStartTime = ros::WallTime::now();
           planning_scene_monitor_->lockSceneRead();
       }
       else {   // EXCLUSIVE LOCK - no other threads can acquire the lock (including the shared).
           // printf("CALLED ONLY IN RVIZ - WHY?");
-          lockWriteStartTime = ros::WallTime::now();
           planning_scene_monitor_->lockSceneWrite();
       }
     }
