@@ -137,8 +137,11 @@ void LazyFreeSpaceUpdater::processThread()
         /* compute the free cells along each ray that ends at an occupied cell */
         for (std::pair<const octomap::OcTreeKey, unsigned int>& it : *process_occupied_cells_set_)
           if (tree_->computeRayKeys(process_sensor_origin_, tree_->keyToCoord(it.first), key_ray1))
-            for (octomap::OcTreeKey& jt : key_ray1)
-              free_cells1[jt] += it.second;
+            for (octomap::OcTreeKey& jt : key_ray1) {
+                auto cellPos = tree_->keyToCoord(jt);
+                if (tree_->IsPointInWorkspace(cellPos))
+                    free_cells1[jt] += it.second;
+            }
       }
 
 #pragma omp section
@@ -146,8 +149,11 @@ void LazyFreeSpaceUpdater::processThread()
         /* compute the free cells along each ray that ends at a model cell */
         for (const octomap::OcTreeKey& it : *process_model_cells_set_)
           if (tree_->computeRayKeys(process_sensor_origin_, tree_->keyToCoord(it), key_ray2))
-            for (octomap::OcTreeKey& jt : key_ray2)
-              free_cells2[jt]++;
+            for (octomap::OcTreeKey& jt : key_ray2) {
+                auto cellPos = tree_->keyToCoord(jt);
+                if (tree_->IsPointInWorkspace(cellPos))
+                    free_cells2[jt]++;
+            }
       }
     }
 
@@ -172,8 +178,11 @@ void LazyFreeSpaceUpdater::processThread()
     try
     {
       // set the logodds to the minimum for the cells that are part of the model
-      for (const octomap::OcTreeKey& it : *process_model_cells_set_)
-        tree_->updateNode(it, lg_0);
+      for (const octomap::OcTreeKey& it : *process_model_cells_set_){
+          auto cellPos = tree_->keyToCoord(it);
+          if (tree_->IsPointInWorkspace(cellPos))
+              tree_->updateNode(it, lg_0);
+      }
 
       /* mark free cells only if not seen occupied in this cloud */
       for (std::pair<const octomap::OcTreeKey, unsigned int>& it : free_cells1)
@@ -188,7 +197,7 @@ void LazyFreeSpaceUpdater::processThread()
     tree_->unlockWrite();
     tree_->triggerUpdateCallback();
 
-    //printf("Marked free cells in %lf ms \n", (ros::WallTime::now() - start).toSec() * 1000.0); // 8 - 10 - 12ms min-avr-max
+//    printf("Marked free cells in %lf ms \n", (ros::WallTime::now() - start).toSec() * 1000.0); // 8 - 10 - 12ms min-avr-max
 
     delete process_occupied_cells_set_;
     process_occupied_cells_set_ = nullptr;

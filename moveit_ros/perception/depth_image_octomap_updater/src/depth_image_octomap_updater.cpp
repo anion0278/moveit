@@ -61,7 +61,11 @@ DepthImageOctomapUpdater::DepthImageOctomapUpdater()
   , queue_size_(5)
   , near_clipping_plane_distance_(0.1)
   , far_clipping_plane_distance_(5.0)
-  , hmi_padding_reduction(0.0)
+  , hmiPaddingReduction(0.0)
+  , probHit(0.995)
+  , probMiss(0.005)
+  , showInfo(1)
+  , freeSpaceUpdaterBatchSize(1)
   , shadow_threshold_(0.04)
   , padding_scale_(0.0)
   , padding_offset_(0.02)
@@ -95,7 +99,15 @@ bool DepthImageOctomapUpdater::setParams(XmlRpc::XmlRpcValue& params)
     if (params.hasMember("queue_size"))
       queue_size_ = (int)params["queue_size"];
 
-    readXmlParam(params, "hmi_padding_reduction", &hmi_padding_reduction);
+    readXmlParam(params, "hmiPaddingReduction", &hmiPaddingReduction);
+
+    readXmlParam(params, "prob_miss", &probMiss);
+    readXmlParam(params, "prob_hit", &probHit);
+    readXmlParam(params, "show_info", &showInfo);
+    readXmlParam(params, "free_space_updater_batch", &freeSpaceUpdaterBatchSize);
+
+      tree_-> setProbHit(probHit);
+      tree_-> setProbMiss(probMiss);
 
     readXmlParam(params, "near_clipping_plane_distance", &near_clipping_plane_distance_);
     readXmlParam(params, "far_clipping_plane_distance", &far_clipping_plane_distance_);
@@ -121,15 +133,11 @@ bool DepthImageOctomapUpdater::setParams(XmlRpc::XmlRpcValue& params)
 bool DepthImageOctomapUpdater::initialize()
 {
   tf_buffer_ = monitor_->getTFClient();
-  free_space_updater_.reset(new LazyFreeSpaceUpdater(tree_));
-
-    tree_-> setProbHit(0.995);
-    tree_-> setProbMiss(0.005);
+  free_space_updater_.reset(new LazyFreeSpaceUpdater(tree_, freeSpaceUpdaterBatchSize)); // CUSTOM its seems that LazyFreeSpaceUpdater should be common for all DepthImageOctomapUpdaters
 
 //    tree_ -> setOccupancyThres(0.4);
-
-    tree_ -> setClampingThresMax(0.8);
-    tree_ -> setClampingThresMin(0.2);
+//    tree_ -> setClampingThresMax(0.8);
+//    tree_ -> setClampingThresMin(0.2);
 
   // create our mesh filter
   mesh_filter_.reset(new mesh_filter::MeshFilter<mesh_filter::StereoCameraModel>(
@@ -148,12 +156,12 @@ void DepthImageOctomapUpdater::start()
   image_transport::TransportHints hints("raw", ros::TransportHints(), nh_);
   pub_model_depth_image_ = model_depth_transport_.advertiseCamera("model_depth", 1);
 
-  if (!filtered_cloud_topic_.empty())
-    pub_filtered_depth_image_ = filtered_depth_transport_.advertiseCamera(filtered_cloud_topic_, 1);
-  else
-    pub_filtered_depth_image_ = filtered_depth_transport_.advertiseCamera("filtered_depth", 1);
-
-  pub_filtered_label_image_ = filtered_label_transport_.advertiseCamera("filtered_label", 1);
+//  if (!filtered_cloud_topic_.empty()) // unused
+//    pub_filtered_depth_image_ = filtered_depth_transport_.advertiseCamera(filtered_cloud_topic_, 1);
+//  else
+//    pub_filtered_depth_image_ = filtered_depth_transport_.advertiseCamera("filtered_depth", 1);
+//
+//  pub_filtered_label_image_ = filtered_label_transport_.advertiseCamera("filtered_label", 1);
 
   sub_depth_image_ = input_depth_transport_.subscribeCamera(image_topic_, queue_size_,
                                                             &DepthImageOctomapUpdater::depthImageCallback, this, hints);
@@ -178,8 +186,8 @@ mesh_filter::MeshHandle DepthImageOctomapUpdater::excludeShape(const shapes::Sha
       h = mesh_filter_->addMesh(static_cast<const shapes::Mesh&>(*shape));
     else
     {
-        printf("Padding reduction for HMI: %lf \n", hmi_padding_reduction);
-      std::unique_ptr<shapes::Mesh> m(shapes::createMeshFromShape(shape.get(), hmi_padding_reduction));
+//        printf("Padding reduction for HMI: %lf \n", hmiPaddingReduction);
+      std::unique_ptr<shapes::Mesh> m(shapes::createMeshFromShape(shape.get(), hmiPaddingReduction));
       if (m)
         h = mesh_filter_->addMesh(*m);
     }
@@ -362,14 +370,6 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   const double px = info_msg->K[2];
   const double py = info_msg->K[5];
 
-//   printf("OCTO Hit %lf \n", tree_->getProbHit());
-//   printf("OCTO Miss %lf \n", tree_->getProbMiss());
-
-//     printf("OCTO Min %lf \n", tree_->getClampingThresMin());
-//     printf("OCTO Max %lf \n", tree_->getClampingThresMax());
-//     printf("OCTO Thres %lf \n", tree_->getOccupancyThres());
-
-
   // if the camera parameters have changed at all, recompute the cache we had
   if (w >= static_cast<int>(x_cache_.size()) || h >= static_cast<int>(y_cache_.size()) || K2_ != px || K5_ != py ||
       K0_ != info_msg->K[0] || K4_ != info_msg->K[4])
@@ -417,72 +417,36 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   const unsigned int* labels_row = &filtered_labels_[0];
   mesh_filter_->getFilteredLabels(&filtered_labels_[0]);
 
-  // publish debug information if needed
-  if (false) // disabled
-  {
-    sensor_msgs::Image debug_msg;
-    debug_msg.header = depth_msg->header;
-    debug_msg.height = h;
-    debug_msg.width = w;
-    debug_msg.is_bigendian = HOST_IS_BIG_ENDIAN;
-    debug_msg.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-    debug_msg.step = w * sizeof(float);
-    debug_msg.data.resize(img_size * sizeof(float));
-    mesh_filter_->getModelDepth(reinterpret_cast<float*>(&debug_msg.data[0]));
-    pub_model_depth_image_.publish(debug_msg, *info_msg);
-
-    sensor_msgs::Image filtered_depth_msg;
-    filtered_depth_msg.header = depth_msg->header;
-    filtered_depth_msg.height = h;
-    filtered_depth_msg.width = w;
-    filtered_depth_msg.is_bigendian = HOST_IS_BIG_ENDIAN;
-    filtered_depth_msg.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-    filtered_depth_msg.step = w * sizeof(float);
-    filtered_depth_msg.data.resize(img_size * sizeof(float));
-    mesh_filter_->getFilteredDepth(reinterpret_cast<float*>(&filtered_depth_msg.data[0]));
-    pub_filtered_depth_image_.publish(filtered_depth_msg, *info_msg);
-
-    sensor_msgs::Image label_msg;
-    label_msg.header = depth_msg->header;
-    label_msg.height = h;
-    label_msg.width = w;
-    label_msg.is_bigendian = HOST_IS_BIG_ENDIAN;
-    label_msg.encoding = sensor_msgs::image_encodings::RGBA8;
-    label_msg.step = w * sizeof(unsigned int);
-    label_msg.data.resize(img_size * sizeof(unsigned int));
-    mesh_filter_->getFilteredLabels(reinterpret_cast<unsigned int*>(&label_msg.data[0]));
-
-    pub_filtered_label_image_.publish(label_msg, *info_msg);
-  }
-
-  if (!filtered_cloud_topic_.empty())
-  {
-    printf("PUBLISHING FILTERED! LOWERED performance");
-    sensor_msgs::Image filtered_msg;
-    filtered_msg.header = depth_msg->header;
-    filtered_msg.height = h;
-    filtered_msg.width = w;
-    filtered_msg.is_bigendian = HOST_IS_BIG_ENDIAN;
-    filtered_msg.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
-    filtered_msg.step = w * sizeof(unsigned short);
-    filtered_msg.data.resize(img_size * sizeof(unsigned short));
-
-    // reuse float buffer across callbacks
-    static std::vector<float> filtered_data;
-    if (filtered_data.size() < img_size)
-      filtered_data.resize(img_size);
-
-    mesh_filter_->getFilteredDepth(reinterpret_cast<float*>(&filtered_data[0]));
-    unsigned short* msg_data = reinterpret_cast<unsigned short*>(&filtered_msg.data[0]);
-    for (std::size_t i = 0; i < img_size; ++i)
-    {
-      // rescale depth to millimeter to work with `unsigned short`
-      msg_data[i] = static_cast<unsigned short>(filtered_data[i] * 1000 + 0.5);
-    }
-    pub_filtered_depth_image_.publish(filtered_msg, *info_msg);
-  }
+//
+//  if (!filtered_cloud_topic_.empty())
+//  {
+//    printf("PUBLISHING FILTERED! LOWERED performance");
+//    sensor_msgs::Image filtered_msg;
+//    filtered_msg.header = depth_msg->header;
+//    filtered_msg.height = h;
+//    filtered_msg.width = w;
+//    filtered_msg.is_bigendian = HOST_IS_BIG_ENDIAN;
+//    filtered_msg.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
+//    filtered_msg.step = w * sizeof(unsigned short);
+//    filtered_msg.data.resize(img_size * sizeof(unsigned short));
+//
+//    // reuse float buffer across callbacks
+//    static std::vector<float> filtered_data;
+//    if (filtered_data.size() < img_size)
+//      filtered_data.resize(img_size);
+//
+//    mesh_filter_->getFilteredDepth(reinterpret_cast<float*>(&filtered_data[0]));
+//    unsigned short* msg_data = reinterpret_cast<unsigned short*>(&filtered_msg.data[0]);
+//    for (std::size_t i = 0; i < img_size; ++i)
+//    {
+//      // rescale depth to millimeter to work with `unsigned short`
+//      msg_data[i] = static_cast<unsigned short>(filtered_data[i] * 1000 + 0.5);
+//    }
+//    pub_filtered_depth_image_.publish(filtered_msg, *info_msg);
+//  }
 
   // figure out occupied cells and model cells
+    ros::WallTime lockReadStart = ros::WallTime::now();
   tree_->lockRead();
 
   try
@@ -557,30 +521,44 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   }
   tree_->unlockRead();
 
+//    printf("Lock read time %lf ms \n", (ros::WallTime::now() - lockReadStart).toSec() * 1000.0);
+
   /* cells that overlap with the model are not occupied */
   for (const octomap::OcTreeKey& model_cell : model_cells)
     occupied_cells.erase(model_cell);
 
-  // mark occupied cells
+    ros::WallTime lockWriteStart = ros::WallTime::now();
+    // mark occupied cells
   tree_->lockWrite();
   try
   {
     /* now mark all occupied cells */
-    for (const octomap::OcTreeKey& occupied_cell : occupied_cells)
-      tree_->updateNode(occupied_cell, true);
+    for (const octomap::OcTreeKey& occupied_cell : occupied_cells) {
+        auto cellPos = tree_->keyToCoord(occupied_cell);
+        if (tree_->IsPointInWorkspace(cellPos))
+            tree_->updateNode(occupied_cell, true);
+    }
   }
   catch (...)
   {
     ROS_ERROR_NAMED(LOGNAME, "Internal error while updating octree");
   }
   tree_->unlockWrite();
+//    printf("Lock write time %lf ms \n", (ros::WallTime::now() - lockWriteStart).toSec() * 1000.0);
+
+    ros::WallTime callbackStart = ros::WallTime::now();
   tree_->triggerUpdateCallback();
 
   // at this point we still have not freed the space
   free_space_updater_->pushLazyUpdate(occupied_cells_ptr, model_cells_ptr, sensor_origin);
 
-  //printf("Processed depth image in %lf ms \n", (ros::WallTime::now() - start).toSec() * 1000.0);
-
-  //ROS_DEBUG_NAMED(LOGNAME, "Processed depth image in %lf ms", (ros::WallTime::now() - start).toSec() * 1000.0);
+  if (showInfo == 1) {
+      double time_spent = (ros::WallTime::now() - start).toSec() * 1000.0;
+      printf("Processed depth image in %lf ms \n", time_spent);
+      if (time_spent > 500) {
+          printf(" *********Check LATENCY ********* \n");
+      }
+      printf("----------------------------------------- \n");
+  }
 }
 }  // namespace occupancy_map_monitor

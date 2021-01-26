@@ -309,7 +309,7 @@ bool planning_pipeline::PlanningPipeline::generatePlan(const planning_scene::Pla
               c_req.max_contacts_per_pair = 2;
               c_req.verbose = false;
               planning_scene->checkCollision(c_req, c_res, robot_state);
-              if (c_res.contact_count > 0 && false) // disabled
+              if (c_res.contact_count > 0 && false) // CUSTOM publishing contacts disabled
               {
                 visualization_msgs::MarkerArray arr_i;
                 collision_detection::getCollisionMarkersFromContacts(arr_i, planning_scene->getPlanningFrame(),
@@ -319,7 +319,7 @@ bool planning_pipeline::PlanningPipeline::generatePlan(const planning_scene::Pla
             }
             ROS_ERROR_STREAM("Completed listing of explanations for invalid states.");
             // if (!arr.markers.empty())
-            //  contacts_publisher_.publish(arr); // Collision Markers disabled to save performace
+            //  contacts_publisher_.publish(arr); // CUSTOM Collision Markers disabled to save performace
           }
         }
         else
@@ -359,6 +359,8 @@ bool planning_pipeline::PlanningPipeline::generatePlan(const planning_scene::Pla
                "unusual. Are you using a move_group_interface and forgetting to call clearPoseTargets() or "
                "equivalent?");
   }
+
+
 
   return solved && valid;
 }

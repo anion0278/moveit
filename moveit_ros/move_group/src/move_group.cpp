@@ -100,7 +100,7 @@ public:
         else
         {
           printf(MOVEIT_CONSOLE_COLOR_GREEN "\nYou can start planning now!\n\n" MOVEIT_CONSOLE_COLOR_RESET);
-          printf(MOVEIT_CONSOLE_COLOR_GREEN "\nCUSTOM MOVEIT!\n\n" MOVEIT_CONSOLE_COLOR_RESET);
+          printf(MOVEIT_CONSOLE_COLOR_GREEN "\nDMS MOVEIT!\n\n" MOVEIT_CONSOLE_COLOR_RESET);
         }
         fflush(stdout);
       }
@@ -190,7 +190,7 @@ int main(int argc, char** argv)
   spinner.start();
   ros::NodeHandle nh;
 
-  std::shared_ptr<tf2_ros::Buffer> tf_buffer = std::make_shared<tf2_ros::Buffer>(ros::Duration(10.0));
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer = std::make_shared<tf2_ros::Buffer>(ros::Duration(2.0)); // CUSTOM
   std::shared_ptr<tf2_ros::TransformListener> tfl = std::make_shared<tf2_ros::TransformListener>(*tf_buffer, nh);
 
   planning_scene_monitor::PlanningSceneMonitorPtr planning_scene_monitor(
@@ -210,7 +210,7 @@ int main(int argc, char** argv)
     else
       ROS_INFO("MoveGroup debug mode is OFF");
 
-    bool debug = false; // dissable anyway
+    bool debug = false; // CUSTOM disable anyway
 
     printf(MOVEIT_CONSOLE_COLOR_CYAN "Starting planning scene monitors...\n" MOVEIT_CONSOLE_COLOR_RESET);
     planning_scene_monitor->startSceneMonitor();

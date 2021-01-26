@@ -539,6 +539,7 @@ void PlanningSceneMonitor::clearOctomap()
 
 bool PlanningSceneMonitor::newPlanningSceneMessage(const moveit_msgs::PlanningScene& scene)
 {
+    printf("New planning scene msg !!! \n");
   if (!scene_)
     return false;
 
@@ -547,7 +548,7 @@ bool PlanningSceneMonitor::newPlanningSceneMessage(const moveit_msgs::PlanningSc
   SceneUpdateType upd = UPDATE_SCENE;
   std::string old_scene_name;
   {
-    boost::unique_lock<boost::shared_mutex> ulock(scene_update_mutex_);
+    boost::unique_lock<boost::shared_mutex> ulock(scene_update_mutex_); // TODO CUSTOM CHECK !!!!!
     // we don't want the transform cache to update while we are potentially changing attached bodies
     boost::recursive_mutex::scoped_lock prevent_shape_cache_updates(shape_handles_lock_);
 
@@ -619,6 +620,7 @@ bool PlanningSceneMonitor::newPlanningSceneMessage(const moveit_msgs::PlanningSc
 
 void PlanningSceneMonitor::newPlanningSceneWorldCallback(const moveit_msgs::PlanningSceneWorldConstPtr& world)
 {
+   // THIS ONE IS NOT USED, SINCE EVENT IS NEVER CALLED
   if (scene_)
   {
     updateFrameTransforms();
@@ -653,7 +655,9 @@ void PlanningSceneMonitor::collisionObjectCallback(const moveit_msgs::CollisionO
     if (!scene_->processCollisionObjectMsg(*obj))
       return;
   }
-//  excludeWorldObjectsFromOctree(); 
+
+
+//  excludeWorldObjectsFromOctree(); // this method calls both exclude and include
   // CUSTOM faster octomap updated after adding/moving a collision object
     boost::recursive_mutex::scoped_lock _(shape_handles_lock_);
     for (const std::pair<const std::string, collision_detection::World::ObjectPtr>& it : *scene_->getWorld())
@@ -948,6 +952,7 @@ bool PlanningSceneMonitor::waitForCurrentRobotState(const ros::Time& t, double w
   return success;
 }
 
+    // SHARED LOCK - no other thread can acquire the exclusive lock, but can acquire the shared lock.
 void PlanningSceneMonitor::lockSceneRead()
 {
   scene_update_mutex_.lock_shared();
@@ -955,6 +960,7 @@ void PlanningSceneMonitor::lockSceneRead()
     octomap_monitor_->getOcTreePtr()->lockRead();
 }
 
+    // SHARED LOCK - no other thread can acquire the exclusive lock, but can acquire the shared lock.
 void PlanningSceneMonitor::unlockSceneRead()
 {
   if (octomap_monitor_)
@@ -962,6 +968,7 @@ void PlanningSceneMonitor::unlockSceneRead()
   scene_update_mutex_.unlock_shared();
 }
 
+    // EXCLUSIVE LOCK - no other threads can acquire the lock (including the shared).
 void PlanningSceneMonitor::lockSceneWrite()
 {
   scene_update_mutex_.lock();
@@ -969,6 +976,7 @@ void PlanningSceneMonitor::lockSceneWrite()
     octomap_monitor_->getOcTreePtr()->lockWrite();
 }
 
+    // EXCLUSIVE LOCK - no other threads can acquire the lock (including the shared).
 void PlanningSceneMonitor::unlockSceneWrite()
 {
   if (octomap_monitor_)
@@ -1215,17 +1223,24 @@ void PlanningSceneMonitor::stateUpdateTimerCallback(const ros::WallTimerEvent& /
 
 void PlanningSceneMonitor::octomapUpdateCallback()
 {
+    ros::WallTime updateStart = ros::WallTime::now();
   if (!octomap_monitor_)
     return;
 
+    ros::WallTime updateTfStart = ros::WallTime::now();
   updateFrameTransforms();
+//    printf("TF update time %lf ms \n", (ros::WallTime::now() - updateTfStart).toSec() * 1000.0);
   {
+      ros::WallTime callReadLockStart = ros::WallTime::now();
     boost::unique_lock<boost::shared_mutex> ulock(scene_update_mutex_);
     last_update_time_ = ros::Time::now();
     octomap_monitor_->getOcTreePtr()->lockRead();
+//      printf("Callb octo read lock time %lf ms \n", (ros::WallTime::now() - callReadLockStart).toSec() * 1000.0);
     try
     {
+        ros::WallTime callProcStart = ros::WallTime::now();
       scene_->processOctomapPtr(octomap_monitor_->getOcTreePtr(), Eigen::Isometry3d::Identity());
+//        printf("Callb proc time %lf ms \n", (ros::WallTime::now() - callProcStart).toSec() * 1000.0);
       octomap_monitor_->getOcTreePtr()->unlockRead();
     }
     catch (...)
@@ -1234,7 +1249,11 @@ void PlanningSceneMonitor::octomapUpdateCallback()
       throw;
     }
   }
-  triggerSceneUpdateEvent(UPDATE_GEOMETRY);
+//    printf("TOTAL update time: %lf ms \n", (ros::WallTime::now() - updateStart).toSec() * 1000.0);
+
+    ros::WallTime updateCallbackStart = ros::WallTime::now();
+  triggerSceneUpdateEvent(UPDATE_GEOMETRY); // its fast
+//    printf("Update callback time: %lf ms \n", (ros::WallTime::now() - updateCallbackStart).toSec() * 1000.0); // fast
 }
 
 void PlanningSceneMonitor::setStateUpdateFrequency(double hz)
@@ -1344,20 +1363,26 @@ void PlanningSceneMonitor::updateFrameTransforms()
 
   if (scene_)
   {
+      ros::WallTime updateTfStart = ros::WallTime::now();
     std::vector<geometry_msgs::TransformStamped> transforms;
-    getUpdatedFrameTransforms(transforms);
+    getUpdatedFrameTransforms(transforms); // fast
+//    printf("getUpdatedFrameTransforms method time %lf ms \n", (ros::WallTime::now() - updateTfStart).toSec() * 1000.0);
     {
-      boost::unique_lock<boost::shared_mutex> ulock(scene_update_mutex_);
+        ros::WallTime tfLockTimeStart = ros::WallTime::now();
+      boost::unique_lock<boost::shared_mutex> ulock(scene_update_mutex_); // CUSTOM  this part is very SLOW !!! basically takes whole time of the method
+//        printf("TF lock time %lf ms \n", (ros::WallTime::now() - tfLockTimeStart).toSec() * 1000.0);
+
       scene_->getTransformsNonConst().setTransforms(transforms);
       last_update_time_ = ros::Time::now();
     }
-    triggerSceneUpdateEvent(UPDATE_TRANSFORMS);
+      ros::WallTime updateTfCallbackStart = ros::WallTime::now();
+    triggerSceneUpdateEvent(UPDATE_TRANSFORMS); // fast
+//      printf("triggerSceneUpdateEvent time %lf ms \n", (ros::WallTime::now() - updateTfCallbackStart).toSec() * 1000.0);
   }
 }
 
 void PlanningSceneMonitor::publishDebugInformation(bool flag)
 {
-    ROS_ERROR("!!!!!!!!!!!!!!!! DEBUG INFO !!!!!!!!");
   if (octomap_monitor_)
     octomap_monitor_->publishDebugInformation(flag);
 }

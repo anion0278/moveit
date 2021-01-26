@@ -113,6 +113,17 @@ public:
     dynamic_reconfigure_server_->setCallback(
         std::bind(&OMPLPlannerManager::dynamicReconfigureCallback, this, std::placeholders::_1, std::placeholders::_2));
     config_settings_ = ompl_interface_->getPlannerConfigurations();
+
+    double maxSegmentLength;
+    nh_.getParam("/move_group/max_segment_length", maxSegmentLength);
+    int minWaypointCount;
+    nh_.getParam("/move_group/min_waypoint_count", minWaypointCount);
+
+    // CUSTOM Both params should be set in order make it work
+    // for some reason these params are not set in init
+    ompl_interface_->getPlanningContextManager().setMaximumSolutionSegmentLength(maxSegmentLength);
+    ompl_interface_->getPlanningContextManager().setMinimumWaypointCount(minWaypointCount);
+
     return true;
   }
 
@@ -147,6 +158,8 @@ public:
                                                             const planning_interface::MotionPlanRequest& req,
                                                             moveit_msgs::MoveItErrorCodes& error_code) const override
   {
+//      printf("MAX LENGTH : %lf \n", ompl_interface_->getPlanningContextManager().getMaximumSolutionSegmentLength());
+//      printf("Min COUNT : %lf \n", ompl_interface_->getPlanningContextManager().getMinimumWaypointCount()); // does not show the actual value
     return ompl_interface_->getPlanningContext(planning_scene, req, error_code);
   }
 
@@ -277,6 +290,8 @@ private:
     ompl_interface_->simplifySolutions(config.simplify_solutions);
     ompl_interface_->getPlanningContextManager().setMaximumSolutionSegmentLength(config.maximum_waypoint_distance);
     ompl_interface_->getPlanningContextManager().setMinimumWaypointCount(config.minimum_waypoint_count);
+    // printf("Segment length max: %lf \n", config.maximum_waypoint_distance);
+    // printf("Min segment count: %d \n", config.minimum_waypoint_count);
     if (display_random_valid_states_ && !config.display_random_valid_states)
     {
       display_random_valid_states_ = false;

@@ -309,7 +309,7 @@ bool OccupancyMapMonitor::saveMapCallback(moveit_msgs::SaveMap::Request& request
                                           moveit_msgs::SaveMap::Response& response)
 {
   ROS_INFO_STREAM_NAMED(LOGNAME, "Writing map to " << request.filename);
-  tree_->lockRead();
+  tree_->lockRead(); // never called
   try
   {
     response.success = tree_->writeBinary(request.filename);

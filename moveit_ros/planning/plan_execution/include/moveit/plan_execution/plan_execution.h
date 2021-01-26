@@ -164,6 +164,7 @@ private:
 
     bool preempt_requested_;
   bool new_scene_update_;
+  bool _showDistances;
 
   bool execution_complete_;
   bool path_became_invalid_;

@@ -40,11 +40,14 @@
 DIAGNOSTIC_PUSH
 SILENT_UNUSED_PARAM
 #include <octomap/octomap.h>
+#include <ros/ros.h>
 DIAGNOSTIC_PUSH
 #include <boost/thread/locks.hpp>
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/function.hpp>
 #include <memory>
+#include <Eigen/Geometry>
+#include <octomap/math/Vector3.h>
 
 namespace occupancy_map_monitor
 {
@@ -63,12 +66,14 @@ public:
 
   /** @brief lock the underlying octree. it will not be read or written by the
    *  monitor until unlockTree() is called */
+    // SHARED LOCK - no other thread can acquire the exclusive lock, but can acquire the shared lock.
   void lockRead()
   {
     tree_mutex_.lock_shared();
   }
 
   /** @brief unlock the underlying octree. */
+    // SHARED LOCK - no other thread can acquire the exclusive lock, but can acquire the shared lock.
   void unlockRead()
   {
     tree_mutex_.unlock_shared();
@@ -76,12 +81,14 @@ public:
 
   /** @brief lock the underlying octree. it will not be read or written by the
    *  monitor until unlockTree() is called */
+   // EXCLUSIVE LOCK - no other threads can acquire the lock (including the shared).
   void lockWrite()
   {
     tree_mutex_.lock();
   }
 
   /** @brief unlock the underlying octree. */
+    // EXCLUSIVE LOCK - no other threads can acquire the lock (including the shared).
   void unlockWrite()
   {
     tree_mutex_.unlock();
@@ -100,10 +107,20 @@ public:
     return WriteLock(tree_mutex_);
   }
 
+  bool IsPointInWorkspace(octomath::Vector3& point)
+  {
+      return point.x() > minWorkspaceCorner.x() && point.y() > minWorkspaceCorner.y() && point.z() > minWorkspaceCorner.z()
+      && point.x() < maxWorkspaceCorner.x() && point.y() < maxWorkspaceCorner.y() && point.z() < maxWorkspaceCorner.z();
+  }
+
   void triggerUpdateCallback()
   {
-    if (update_callback_)
-      update_callback_();
+    if (update_callback_){
+        update_callback_();
+    }
+    else {
+//        printf("No callback \n");
+    }
   }
 
   /** @brief Set the callback to trigger when updates are received */
@@ -111,6 +128,10 @@ public:
   {
     update_callback_ = update_callback;
   }
+
+// CUSTOM limitation of octomap
+    Eigen::Vector3d minWorkspaceCorner = Eigen::Vector3d(-0.15,0,0.95);
+    Eigen::Vector3d maxWorkspaceCorner = Eigen::Vector3d(1, 1, 2);
 
 private:
   boost::shared_mutex tree_mutex_;

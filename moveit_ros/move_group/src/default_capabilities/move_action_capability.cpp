@@ -198,6 +198,7 @@ void MoveGroupMoveAction::executeMoveCallbackPlanOnly(const moveit_msgs::MoveGro
 bool MoveGroupMoveAction::planUsingPlanningPipeline(const planning_interface::MotionPlanRequest& req,
                                                     plan_execution::ExecutableMotionPlan& plan)
 {
+    ros::WallTime start = ros::WallTime::now();
   setMoveState(PLANNING);
 
   planning_scene_monitor::LockedPlanningSceneRO lscene(plan.planning_scene_monitor_);
@@ -219,6 +220,8 @@ bool MoveGroupMoveAction::planUsingPlanningPipeline(const planning_interface::Mo
     plan.plan_components_[0].description_ = "plan";
   }
   plan.error_code_ = res.error_code_;
+
+    // printf("Planning locked scene for %lf ms \n", (ros::WallTime::now() - start).toSec() * 1000.0);
   return solved;
 }
 

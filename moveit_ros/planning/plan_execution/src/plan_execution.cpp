@@ -79,13 +79,15 @@ plan_execution::PlanExecution::PlanExecution(
 {
   node_handle_.setParam("collision/min_clearance", 0);
 
-  _markerPublisher = node_handle_.advertise<visualization_msgs::MarkerArray>("collision_vectors", 10);
+  _markerPublisher = node_handle_.advertise<visualization_msgs::MarkerArray>("collision_vectors", 5);
 
   if (!trajectory_execution_manager_)
     trajectory_execution_manager_.reset(new trajectory_execution_manager::TrajectoryExecutionManager(
         planning_scene_monitor_->getRobotModel(), planning_scene_monitor_->getStateMonitor()));
 
   default_max_replan_attempts_ = 5;
+
+   node_handle_.getParam("collision/show_distances", _showDistances);
 
   preempt_requested_ = false;
   new_scene_update_ = false;
@@ -189,25 +191,6 @@ void plan_execution::PlanExecution::planAndExecuteHelper(ExecutableMotionPlan& p
 
     // if we never had a solved plan, or there is no specified way of fixing plans, just call the planner; otherwise,
     // try to repair the plan we previously had;
-
-    if (previously_solved)
-    {
-      ROS_INFO_NAMED("CUSTOM", "PREVIOUSLY SOLVED TRUE");
-    }
-
-    if (opt.repair_plan_callback_)
-    {
-      ROS_INFO_NAMED("CUSTOM", "REPAIR COLLBACK IS AVAILABLE");
-    }
-
-    if (!previously_solved || !opt.repair_plan_callback_)
-    {
-      ROS_INFO_NAMED("CUSTOM", "CANT REPAIR PLAN (unavailable?)");
-    }
-    else
-    {
-      ROS_INFO_NAMED("CUSTOM", "REPAIRING PREVIOUS PLAN");
-    }
     
     bool solved =
         (!previously_solved || !opt.repair_plan_callback_) ?
@@ -291,14 +274,12 @@ void plan_execution::PlanExecution::planAndExecuteHelper(ExecutableMotionPlan& p
 bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionPlan& plan,
                                                          const std::pair<int, int>& path_segment)
 {
+    ros::WallTime start = ros::WallTime::now();
   if (path_segment.first >= 0 &&
       plan.plan_components_[path_segment.first].trajectory_monitoring_)  // If path_segment.second <= 0, the function
                                                                          // will fallback to check the entire trajectory
   {
-    planning_scene_monitor::LockedPlanningSceneRO lscene(plan.planning_scene_monitor_);  // lock the scene so that it
-                                                                                         // does not modify the world
-                                                                                         // representation while
-                                                                                         // isStateValid() is called
+
     const robot_trajectory::RobotTrajectory& t = *plan.plan_components_[path_segment.first].trajectory_;
     const collision_detection::AllowedCollisionMatrix* acm =
         plan.plan_components_[path_segment.first].allowed_collision_matrix_.get();
@@ -306,9 +287,11 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
     collision_detection::CollisionRequest req(true);
     req.group_name = t.getGroupName();
 
+// ACM is not used !!!
+
+      //////////////////////////////// HMIs
     std::string hmiLeft = "hmi_left";
     std::string hmiRight = "hmi_right";
-
     double minDistance = 9999.0;
     double minDistanceNonHmi = minDistance;
     collision_detection::DistanceResultsData minDistDataNonHmi;
@@ -319,8 +302,12 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
 
     for (std::size_t i = std::max(path_segment.second - 1, 0); i < wpc; ++i)
     {
+        ros::Duration(0.003).sleep();
+        planning_scene_monitor::LockedPlanningSceneRO lscene(plan.planning_scene_monitor_);  
       collision_detection::CollisionResult res;
       double dist = 0;
+
+      ros::WallTime startColCheck = ros::WallTime::now();
       if (acm)
       {
         dist = plan.planning_scene_->checkCollisionUnpadded(req, res, t.getWayPoint(i), *acm);
@@ -330,13 +317,9 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
         dist = plan.planning_scene_->checkCollisionUnpadded(req, res, t.getWayPoint(i));
         // for some reason the acMatrix is not avalable
       }
+//        printf("Checked waypoint (%d) collision  in %lf ms \n", i, (ros::WallTime::now() - startColCheck).toSec() * 1000.0);
 
       //////////////////////////////// HMIs
-      if (dist < minDistance)
-      {
-        minDistance = dist;
-      }
-
       if (minDistanceRight > res.hmiRightDistance)
       {
           minDistanceRight = res.hmiRightDistance;
@@ -363,14 +346,19 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
           plan.planning_scene_->checkCollisionUnpadded(req, res, t.getWayPoint(i), *acm);
         else
           plan.planning_scene_->checkCollisionUnpadded(req, res, t.getWayPoint(i));
+
+//          printf("Checked path feasibility (FALSE) in %lf ms \n", (ros::WallTime::now() - start).toSec() * 1000.0);
         return false;
       }
     }
-    printf("-------------------------------------------\n");
-    printf("Min distance: %lf [m]\n", minDistance);
-    printf("Min distance to obstacle: %lf [m]\n", minDistanceNonHmi);
-    printf("Min right HMI distance: %lf [m]\n", minDistanceRight);
-    printf("Min left HMI distance: %lf [m]\n", minDistanceLeft);
+
+     //////////////////////////////// HMIs
+    if (_showDistances) {
+        printf("-------------------------------------------\n");
+        printf("Min distance to obstacle: %lf [m]\n", minDistanceNonHmi);
+        printf("Min right HMI distance: %lf [m]\n", minDistanceRight);
+        printf("Min left HMI distance: %lf [m]\n", minDistanceLeft);
+    }
 
     std::string clearance_param = "collision/min_clearance";
     node_handle_.setParam(clearance_param, minDistanceNonHmi);
@@ -389,9 +377,10 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
       vectorColor.g = 0;
       vectorColor.b = 1;
 
-    PublishVector(minDistDataRight, hmiRight, 1, pointColor, vectorColor);
-    PublishVector(minDistDataLeft, hmiLeft, 11, pointColor, vectorColor);
+    PublishVector(minDistDataRight, hmiRight, 10, pointColor, vectorColor); // NEPUBLIKUJE se pokud jsme vylezli z cyklu
+    PublishVector(minDistDataLeft, hmiLeft, 20, pointColor, vectorColor);
   }
+//  printf("Checked path feasibility (TRUE) in %lf ms \n", (ros::WallTime::now() - start).toSec() * 1000.0);
   return true;
 }
 
@@ -518,7 +507,7 @@ moveit_msgs::MoveItErrorCodes plan_execution::PlanExecution::executeAndMonitor(E
   int prev = -1;
   for (std::size_t i = 0; i < plan.plan_components_.size(); ++i)
   {
-      printf("Number of waypoints: %d \n", plan.plan_components_[i].trajectory_->getWayPointCount());
+      // printf("Number of waypoints: %d \n", plan.plan_components_[i].trajectory_->getWayPointCount()); // CUSTOM
 
     // \todo should this be in trajectory_execution ? Maybe. Then that will have to use kinematic_trajectory too;
     // spliting trajectories for controllers becomes interesting: tied to groups instead of joints. this could cause
@@ -541,12 +530,14 @@ moveit_msgs::MoveItErrorCodes plan_execution::PlanExecution::executeAndMonitor(E
     {
       // unwind the path to execute based on the current state of the system
       if (prev < 0)
+      {
         plan.plan_components_[i].trajectory_->unwind(
             plan.planning_scene_monitor_ && plan.planning_scene_monitor_->getStateMonitor() ?
                 *plan.planning_scene_monitor_->getStateMonitor()->getCurrentState() :
-                plan.planning_scene_->getCurrentState());
-      else
-        plan.plan_components_[i].trajectory_->unwind(plan.plan_components_[prev].trajectory_->getLastWayPoint());
+                plan.planning_scene_->getCurrentState());}
+      else {
+          plan.plan_components_[i].trajectory_->unwind(plan.plan_components_[prev].trajectory_->getLastWayPoint());
+      }
     }
 
     if (plan.plan_components_[i].trajectory_ && !plan.plan_components_[i].trajectory_->empty())
@@ -583,11 +574,11 @@ moveit_msgs::MoveItErrorCodes plan_execution::PlanExecution::executeAndMonitor(E
       boost::bind(&PlanExecution::doneWithTrajectoryExecution, this, _1),
       boost::bind(&PlanExecution::successfulTrajectorySegmentExecution, this, &plan, _1));
   // wait for path to be done, while checking that the path does not become invalid
-  ros::Rate r(100); ///////////////////////////////////////////////////////////////////////////////////////////////////////// TODO CUSTOM DMS CHECK OUT
+  ros::Rate r(10); 
   path_became_invalid_ = false;
   while (node_handle_.ok() && !execution_complete_ && !preempt_requested_ && !path_became_invalid_)
   {
-    r.sleep();
+    r.sleep(); // CUSTOM this does not actually count the time since the last check was performed
     // check the path if there was an environment update in the meantime
     if (new_scene_update_)
     {
@@ -672,6 +663,7 @@ void plan_execution::PlanExecution::doneWithTrajectoryExecution(
 void plan_execution::PlanExecution::successfulTrajectorySegmentExecution(const ExecutableMotionPlan* plan,
                                                                          std::size_t index)
 {
+  // Custom method is not executed for usual traj.
   if (plan->plan_components_.empty())
   {
     ROS_WARN_NAMED("plan_execution", "Length of provided motion plan is zero.");

@@ -135,7 +135,7 @@ void CollisionPluginLoader::setupScene(ros::NodeHandle& nh, const planning_scene
   }
 
   activate(collision_detector_name, scene, true);
-  ROS_INFO_STREAM("Using collision detector:" << scene->getActiveCollisionDetectorName().c_str());
+  printf("Using collision detector: %s \n", scene->getActiveCollisionDetectorName().c_str());
 }
 
 }  // namespace collision_detection
