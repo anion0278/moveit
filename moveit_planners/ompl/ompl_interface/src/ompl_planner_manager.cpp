@@ -114,6 +114,7 @@ public:
         std::bind(&OMPLPlannerManager::dynamicReconfigureCallback, this, std::placeholders::_1, std::placeholders::_2));
     config_settings_ = ompl_interface_->getPlannerConfigurations();
 
+    printf("Setting planning params \n");
     double maxSegmentLength;
     nh_.getParam("/move_group/max_segment_length", maxSegmentLength);
     int minWaypointCount;
@@ -123,7 +124,7 @@ public:
     // for some reason these params are not set in init
     ompl_interface_->getPlanningContextManager().setMaximumSolutionSegmentLength(maxSegmentLength);
     ompl_interface_->getPlanningContextManager().setMinimumWaypointCount(minWaypointCount);
-
+    printf("Planning params were set \n");
     return true;
   }
 

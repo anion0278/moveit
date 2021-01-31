@@ -147,7 +147,8 @@ private:
     visualization_msgs::Marker GetPointMarker(const std::string& name, const std::string& frame_id, int id, Eigen::Vector3d& point, std_msgs::ColorRGBA& pointColor, int action);
     visualization_msgs::Marker GetArrowMarker(const std::string& name, const std::string& frame_id, int id, Eigen::Vector3d& point1, Eigen::Vector3d& point2, std_msgs::ColorRGBA& arrowColor, int action);
     void RemoveAllMarkers();
-
+    void PublishHmiCollisionData(collision_detection::DistanceResultsData minDistDataNonHmi, collision_detection::DistanceResultsData minDistDataRight, collision_detection::DistanceResultsData minDistDataLeft);
+    void SendHmiData(const double &minDistNonHmi,const double &minDistRight,const double &minDistLeft);
 
   void planningSceneUpdatedCallback(const planning_scene_monitor::PlanningSceneMonitor::SceneUpdateType update_type);
   void doneWithTrajectoryExecution(const moveit_controller_manager::ExecutionStatus& status);
@@ -165,9 +166,13 @@ private:
     bool preempt_requested_;
   bool new_scene_update_;
   bool _showDistances;
+  bool _showVectorPoints;
 
   bool execution_complete_;
   bool path_became_invalid_;
+
+  std::string hmiLeft  = "hmi_left";
+  std::string hmiRight  = "hmi_right";
 
   class DynamicReconfigureImpl;
   DynamicReconfigureImpl* reconfigure_impl_;

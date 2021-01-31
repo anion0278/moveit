@@ -88,6 +88,7 @@ plan_execution::PlanExecution::PlanExecution(
   default_max_replan_attempts_ = 5;
 
    node_handle_.getParam("collision/show_distances", _showDistances);
+   node_handle_.getParam("collision/show_vector_points", _showVectorPoints);
 
   preempt_requested_ = false;
   new_scene_update_ = false;
@@ -162,7 +163,9 @@ void plan_execution::PlanExecution::planAndExecute(ExecutableMotionPlan& plan,
     }
     planAndExecuteHelper(plan, opt);
   }
+
   RemoveAllMarkers();
+  SendHmiData(999.0,999.0,999.0);
 }
 
 void plan_execution::PlanExecution::planAndExecuteHelper(ExecutableMotionPlan& plan, const Options& opt)
@@ -281,17 +284,18 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
   {
 
     const robot_trajectory::RobotTrajectory& t = *plan.plan_components_[path_segment.first].trajectory_;
-    const collision_detection::AllowedCollisionMatrix* acm =
-        plan.plan_components_[path_segment.first].allowed_collision_matrix_.get();
+//    const collision_detection::AllowedCollisionMatrix* acm =
+//        plan.plan_components_[path_segment.first].allowed_collision_matrix_.get(); // This collision matrix was never supplied
+
+    // so instead - use the global ACM
+    const collision_detection::AllowedCollisionMatrix* acm = &(getPlanningSceneMonitor()->getPlanningScene()->getAllowedCollisionMatrix());
+
     std::size_t wpc = t.getWayPointCount();
     collision_detection::CollisionRequest req(true);
     req.group_name = t.getGroupName();
 
-// ACM is not used !!!
 
       //////////////////////////////// HMIs
-    std::string hmiLeft = "hmi_left";
-    std::string hmiRight = "hmi_right";
     double minDistance = 9999.0;
     double minDistanceNonHmi = minDistance;
     collision_detection::DistanceResultsData minDistDataNonHmi;
@@ -310,12 +314,13 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
       ros::WallTime startColCheck = ros::WallTime::now();
       if (acm)
       {
+        //  printf("USING ACM !! \n");
         dist = plan.planning_scene_->checkCollisionUnpadded(req, res, t.getWayPoint(i), *acm);
       }
       else
       {
+        //  printf("NOT using ACM \n");
         dist = plan.planning_scene_->checkCollisionUnpadded(req, res, t.getWayPoint(i));
-        // for some reason the acMatrix is not avalable
       }
 //        printf("Checked waypoint (%d) collision  in %lf ms \n", i, (ros::WallTime::now() - startColCheck).toSec() * 1000.0);
 
@@ -347,41 +352,53 @@ bool plan_execution::PlanExecution::isRemainingPathValid(const ExecutableMotionP
         else
           plan.planning_scene_->checkCollisionUnpadded(req, res, t.getWayPoint(i));
 
-//          printf("Checked path feasibility (FALSE) in %lf ms \n", (ros::WallTime::now() - start).toSec() * 1000.0);
+        PublishHmiCollisionData(minDistDataNonHmi, minDistDataRight, minDistDataLeft); // HMI data should be published anyway !
+
+//      printf("Checked path feasibility (FALSE) in %lf ms \n", (ros::WallTime::now() - start).toSec() * 1000.0);
         return false;
       }
     }
 
-     //////////////////////////////// HMIs
-    if (_showDistances) {
-        printf("-------------------------------------------\n");
-        printf("Min distance to obstacle: %lf [m]\n", minDistanceNonHmi);
-        printf("Min right HMI distance: %lf [m]\n", minDistanceRight);
-        printf("Min left HMI distance: %lf [m]\n", minDistanceLeft);
-    }
-
-    std::string clearance_param = "collision/min_clearance";
-    node_handle_.setParam(clearance_param, minDistanceNonHmi);
-    node_handle_.setParam(clearance_param + "_" + hmiRight, minDistanceRight);
-    node_handle_.setParam(clearance_param + "_" + hmiLeft, minDistanceLeft);
-
-    std_msgs::ColorRGBA pointColor;
-      pointColor.a = 0.9;
-      pointColor.r = 0;
-      pointColor.g = 0;
-      pointColor.b = 1;
-
-    std_msgs::ColorRGBA vectorColor;
-      vectorColor.a = 0.5;
-      vectorColor.r = 0;
-      vectorColor.g = 0;
-      vectorColor.b = 1;
-
-    PublishVector(minDistDataRight, hmiRight, 10, pointColor, vectorColor); // NEPUBLIKUJE se pokud jsme vylezli z cyklu
-    PublishVector(minDistDataLeft, hmiLeft, 20, pointColor, vectorColor);
+    PublishHmiCollisionData(minDistDataNonHmi, minDistDataRight, minDistDataLeft);
   }
 //  printf("Checked path feasibility (TRUE) in %lf ms \n", (ros::WallTime::now() - start).toSec() * 1000.0);
   return true;
+}
+
+void plan_execution::PlanExecution::PublishHmiCollisionData(collision_detection::DistanceResultsData minDistDataNonHmi, collision_detection::DistanceResultsData minDistDataRight, collision_detection::DistanceResultsData minDistDataLeft)
+{
+    if (_showDistances) {
+        printf("-------------------------------------------\n");
+        printf("Min distance to obstacle: %lf [m]\n", minDistDataNonHmi.distance);
+        printf("Min right HMI distance: %lf [m]\n", minDistDataRight.distance);
+        printf("Min left HMI distance: %lf [m]\n", minDistDataLeft.distance);
+    }
+
+    SendHmiData(minDistDataNonHmi.distance, minDistDataRight.distance, minDistDataLeft.distance);
+
+    std_msgs::ColorRGBA pointColor;
+    pointColor.a = 0.9;
+    pointColor.r = 0;
+    pointColor.g = 0;
+    pointColor.b = 1;
+
+    std_msgs::ColorRGBA vectorColor;
+    vectorColor.a = 0.5;
+    vectorColor.r = 0;
+    vectorColor.g = 0;
+    vectorColor.b = 1;
+
+    PublishVector(minDistDataRight, hmiRight, 10, pointColor, vectorColor);
+    PublishVector(minDistDataLeft, hmiLeft, 20, pointColor, vectorColor);
+}
+
+void plan_execution::PlanExecution::SendHmiData(const double &minDistNonHmi,
+                                const double &minDistRight,
+                                const double &minDistLeft) {
+    std::string clearance_param = "collision/min_clearance";
+    this->node_handle_.setParam(clearance_param, minDistNonHmi);
+    this->node_handle_.setParam(clearance_param + "_" + hmiRight, minDistRight);
+    this->node_handle_.setParam(clearance_param + "_" + hmiLeft, minDistLeft);
 }
 
 void plan_execution::PlanExecution::RemoveAllMarkers()
@@ -405,14 +422,18 @@ void plan_execution::PlanExecution::PublishVector(collision_detection::DistanceR
         action = visualization_msgs::Marker::DELETE;
     }
 
-    auto mp1 = GetPointMarker(name + "_nearest_robot", "world", id + 1, p2World, pointColor, action);
-    auto mp2 = GetPointMarker(name + "_nearest_hmi", "world", id + 2, p1World, pointColor, action);
-    auto vec = GetArrowMarker(name + "_vector", "world", id + 3, p1World, p2World, pointColor, action);
-
     visualization_msgs::MarkerArray markerArray;
+
+    if (_showVectorPoints) {
+        auto mp1 = GetPointMarker(name + "_nearest_robot", "world", id + 1, p2World, pointColor, action);
+        markerArray.markers.push_back(mp1);
+
+        auto mp2 = GetPointMarker(name + "_nearest_hmi", "world", id + 2, p1World, pointColor, action);
+        markerArray.markers.push_back(mp2);
+    }
+
+    auto vec = GetArrowMarker(name + "_vector", "world", id + 3, p1World, p2World, pointColor, action);
     markerArray.markers.push_back(vec);
-    markerArray.markers.push_back(mp1);
-    markerArray.markers.push_back(mp2);
 
     if (_markerPublisher.getNumSubscribers() > 0)
         _markerPublisher.publish(markerArray);
